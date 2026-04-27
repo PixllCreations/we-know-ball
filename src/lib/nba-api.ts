@@ -97,7 +97,25 @@ export interface ConferenceStandings {
 
 export function getScoreboard(yyyymmdd?: string) {
   const q = yyyymmdd ? `?dates=${yyyymmdd}` : "";
-  return get<ScoreboardResponse>(`${BASE}/scoreboard${q}`);
+  return get<ScoreboardResponse>(`${BASE}/scoreboard${q}`).then((data) => {
+    if (import.meta.env.DEV) {
+      console.groupCollapsed(`[ESPN scoreboard] ${yyyymmdd ?? "today"} - ${data.events?.length ?? 0} games`);
+      for (const event of data.events ?? []) {
+        const comp = event.competitions?.[0];
+        console.log({
+          id: event.id,
+          name: event.name,
+          state: event.status?.type?.state,
+          statusDetail: event.status?.type?.shortDetail,
+          broadcasts: comp?.broadcasts,
+          geoBroadcasts: (comp as any)?.geoBroadcasts,
+          links: (event as any)?.links,
+        });
+      }
+      console.groupEnd();
+    }
+    return data;
+  });
 }
 
 export function getTeams() {

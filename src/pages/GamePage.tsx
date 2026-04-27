@@ -24,52 +24,73 @@ const GamePage = () => {
   const periods = Math.max(home.linescores?.length ?? 0, away.linescores?.length ?? 0, 4);
 
   return (
-    <div className="space-y-10">
-      <Link to="/" className="font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-primary">
+    <div className="mx-auto max-w-5xl space-y-8">
+      <Link
+        to="/"
+        className="font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-primary"
+      >
         ← Scoreboard
       </Link>
 
       {/* Header */}
-      <section className="rounded-2xl border border-border bg-gradient-court p-8 shadow-card">
-        <div className="mb-6 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-wider">
+      <section className="rounded-2xl border border-border bg-gradient-court p-6 shadow-card md:p-8">
+        <div className="mb-8 flex items-center justify-center gap-2 font-mono text-base uppercase tracking-widest md:text-lg">
           {isLive && <span className="live-dot" />}
           <span className={cn("text-muted-foreground", isLive && "text-live font-semibold")}>
             {status.type.detail}
           </span>
         </div>
 
-        <div className="grid grid-cols-3 items-center gap-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-6">
           <TeamSide team={away} />
-          <div className="text-center">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">vs</div>
+          <div className="font-display text-2xl font-bold uppercase tracking-widest text-muted-foreground md:text-3xl">
+            vs
           </div>
-          <TeamSide team={home} reverse />
+          <TeamSide
+            team={home}
+            reverse
+          />
         </div>
 
         {/* Linescore */}
-        <div className="mt-8 overflow-x-auto">
-          <table className="mx-auto text-sm tabular">
+        <div className="mt-10 overflow-x-auto">
+          <table className="mx-auto text-lg tabular md:text-xl">
             <thead>
-              <tr className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-1 text-left">Team</th>
+              <tr className="font-mono text-xs uppercase tracking-wider text-muted-foreground md:text-sm">
+                <th className="px-5 py-2 text-left">Team</th>
                 {Array.from({ length: periods }).map((_, i) => (
-                  <th key={i} className="px-3 py-1 text-right">
+                  <th
+                    key={i}
+                    className="px-5 py-2 text-right"
+                  >
                     {i < 4 ? `Q${i + 1}` : `OT${i - 3}`}
                   </th>
                 ))}
-                <th className="px-4 py-1 text-right text-foreground">T</th>
+                <th className="px-6 py-2 text-right text-foreground">T</th>
               </tr>
             </thead>
             <tbody>
               {[away, home].map((t) => (
-                <tr key={t.id} className="border-t border-border/60">
-                  <td className="px-3 py-2 font-display font-semibold">{t.team.abbreviation}</td>
-                  {Array.from({ length: periods }).map((_, i) => (
-                    <td key={i} className="px-3 py-2 text-right text-muted-foreground">
-                      {t.linescores?.[i]?.value ?? "—"}
-                    </td>
-                  ))}
-                  <td className="px-4 py-2 text-right font-display font-bold">{t.score}</td>
+                <tr
+                  key={t.id}
+                  className="border-t border-border/60"
+                >
+                  <td className="px-5 py-3 font-display text-xl font-semibold md:text-2xl">
+                    {t.team.abbreviation}
+                  </td>
+                  {Array.from({ length: periods }).map((_, i) => {
+                    const ls = t.linescores?.[i] as any;
+                    const val = ls?.displayValue ?? ls?.value;
+                    return (
+                      <td
+                        key={i}
+                        className="px-5 py-3 text-right text-muted-foreground"
+                      >
+                        {val ?? "—"}
+                      </td>
+                    );
+                  })}
+                  <td className="px-6 py-3 text-right font-display font-bold">{t.score}</td>
                 </tr>
               ))}
             </tbody>
@@ -88,15 +109,18 @@ const GamePage = () => {
               <thead>
                 <tr className="border-b border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-2 text-left">Stat</th>
-                  <th className="px-4 py-2 text-right">{away.team.abbreviation}</th>
-                  <th className="px-4 py-2 text-right">{home.team.abbreviation}</th>
+                  <th className="w-32 px-4 py-2 text-right">{away.team.abbreviation}</th>
+                  <th className="w-32 px-4 py-2 text-right">{home.team.abbreviation}</th>
                 </tr>
               </thead>
               <tbody>
                 {data.boxscore.teams[0].statistics.map((stat, idx) => {
                   const homeStat = data.boxscore!.teams[1].statistics[idx];
                   return (
-                    <tr key={stat.name} className="border-b border-border/60 last:border-0 hover:bg-surface-hover">
+                    <tr
+                      key={stat.name}
+                      className="border-b border-border/60 last:border-0 hover:bg-surface-hover"
+                    >
                       <td className="px-4 py-2 text-muted-foreground">{stat.label}</td>
                       <td className="px-4 py-2 text-right">{stat.displayValue}</td>
                       <td className="px-4 py-2 text-right">{homeStat?.displayValue ?? "—"}</td>
@@ -111,33 +135,52 @@ const GamePage = () => {
 
       {/* Player box scores */}
       {data.boxscore?.players?.map((teamBox) => (
-        <PlayerBox key={teamBox.team.id} teamBox={teamBox} />
+        <PlayerBox
+          key={teamBox.team.id}
+          teamBox={teamBox}
+        />
       ))}
     </div>
   );
 };
 
-const TeamSide = ({ team, reverse }: { team: any; reverse?: boolean }) => (
-  <div className={cn("flex items-center gap-4", reverse && "flex-row-reverse text-right")}>
-    {team.team.logo && (
-      <img src={team.team.logo} alt="" className="h-20 w-20 object-contain" />
-    )}
-    <div>
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-        {team.records?.[0]?.summary}
-      </div>
-      <div className="font-display text-2xl font-bold leading-tight">{team.team.shortDisplayName}</div>
-      <div
-        className={cn(
-          "tabular mt-1 font-display text-5xl font-bold leading-none",
-          team.winner ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        {team.score}
+const TeamSide = ({ team, reverse }: { team: any; reverse?: boolean }) => {
+  const logo = team.team.logo ?? team.team.logos?.[0]?.href;
+  const recordSummary =
+    team.records?.[0]?.summary ??
+    team.record?.find?.((r: any) => r.type === "total")?.summary ??
+    team.record?.[0]?.summary;
+  return (
+    <div className={cn("flex flex-1 items-center gap-6", reverse && "flex-row-reverse text-right")}>
+      {logo && (
+        <img
+          src={logo}
+          alt=""
+          className="h-28 w-28 shrink-0 object-contain md:h-32 md:w-32"
+        />
+      )}
+      <div className="min-w-0 text-center">
+        <div
+          className={cn(
+            "tabular font-display text-7xl font-bold leading-none md:text-8xl",
+            team.winner ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {team.score}
+        </div>
+        <div className="mt-3 font-display text-2xl font-bold leading-tight md:text-3xl">
+          {team.team.shortDisplayName ??
+            team.team.displayName ??
+            team.team.name ??
+            team.team.abbreviation}
+        </div>
+        <div className="mt-1 font-mono text-xs uppercase tracking-wider text-muted-foreground md:text-sm">
+          {recordSummary}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const PlayerBox = ({ teamBox }: { teamBox: any }) => {
   const stats = teamBox.statistics?.[0];
@@ -145,7 +188,13 @@ const PlayerBox = ({ teamBox }: { teamBox: any }) => {
   return (
     <section>
       <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        {teamBox.team.logo && <img src={teamBox.team.logo} alt="" className="h-5 w-5" />}
+        {(teamBox.team.logo ?? teamBox.team.logos?.[0]?.href) && (
+          <img
+            src={teamBox.team.logo ?? teamBox.team.logos?.[0]?.href}
+            alt=""
+            className="h-5 w-5"
+          />
+        )}
         {teamBox.team.displayName}
       </h2>
       <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card">
@@ -154,7 +203,10 @@ const PlayerBox = ({ teamBox }: { teamBox: any }) => {
             <tr className="border-b border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-2 text-left">Player</th>
               {stats.names.map((n: string) => (
-                <th key={n} className="px-2 py-2 text-right">
+                <th
+                  key={n}
+                  className="px-2 py-2 text-right"
+                >
                   {n}
                 </th>
               ))}
@@ -179,7 +231,10 @@ const PlayerBox = ({ teamBox }: { teamBox: any }) => {
                   )}
                 </td>
                 {a.stats.map((s: string, i: number) => (
-                  <td key={i} className="px-2 py-2 text-right">
+                  <td
+                    key={i}
+                    className="px-2 py-2 text-right"
+                  >
                     {s || "—"}
                   </td>
                 ))}
