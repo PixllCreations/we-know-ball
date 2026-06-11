@@ -1,91 +1,291 @@
-# WeKnowBall
+# We Know Ball 🏀
 
-A modern NBA tracker built with React + TypeScript that surfaces live scores, standings, team details, rosters, schedules, and game summaries.
+**Because everyone thinks they know ball.**
 
-## Tech Stack
+We Know Ball is a real-time NBA analytics and data platform built with an Odin backend and modern web technologies.
 
-- React 18 + TypeScript
-- Vite 5
-- React Router
-- TanStack Query
-- Tailwind CSS + shadcn/ui primitives
-- Vitest + Testing Library
+The platform aggregates live NBA data, standings, player statistics, team information, and advanced analytics into a single experience designed for fans who want more than a basic scoreboard.
+
+Rather than replicating ESPN, We Know Ball focuses on delivering faster updates, deeper insights, and tools that help users explore, compare, and analyze the league.
+
+---
+
+## Vision
+
+Most sports websites answer:
+
+> "What happened?"
+
+We Know Ball aims to answer:
+
+> "Why did it happen?"
+>
+> "What happens next?"
+>
+> "Who actually knows ball?"
+
+The long-term goal is to evolve from a live NBA dashboard into a complete basketball analytics and simulation platform.
+
+---
 
 ## Features
 
-- Live scoreboard with game status and matchup details
-- Conference standings view
-- Team directory and team detail pages
-- Team rosters and schedules
-- Individual game pages with summary/box score data
-- Client-side data layer abstracted in `src/lib/nba-api.ts`
+### Live Games
 
-## Data Source
+- Real-time scores
+- Live game tracking
+- Play-by-play updates
+- Game summaries
+- Team statistics
 
-The app currently uses ESPN's public NBA endpoints through the API layer in `src/lib/nba-api.ts`.
+### Teams
 
-## Getting Started
+- Team profiles
+- Rosters
+- Standings
+- Schedule tracking
+- Team performance analytics
 
-### Prerequisites
+### Players
 
-- Node.js 18+ (or Bun)
+- Player profiles
+- Season statistics
+- Career comparisons
+- Advanced metrics
+- Performance trends
 
-### Install Dependencies
+### Analytics
 
-Using npm:
+- Team rankings
+- Player comparisons
+- Efficiency metrics
+- Historical trends
+- Custom power rankings
 
-```bash
-npm install
-```
+### Hot Takes
 
-Using bun:
+Because everyone thinks they know ball.
 
-```bash
-bun install
-```
+- MVP predictions
+- Championship predictions
+- Trade grades
+- Award forecasting
+- Power ranking debates
+- Weekly community picks
+- Accuracy tracking for predictions
 
-### Run Development Server
+### Future Features
 
-Using npm:
+- Trade machine
+- Salary cap explorer
+- Draft simulator
+- Season simulator
+- Playoff simulator
+- Fantasy basketball tools
 
-```bash
-npm run dev
-```
+---
 
-Using bun:
-
-```bash
-bun run dev
-```
-
-Then open the local URL shown by Vite (typically `http://localhost:5173`).
-
-## Available Scripts
-
-- `dev` - start local dev server
-- `build` - production build
-- `build:dev` - development-mode build
-- `preview` - preview production build locally
-- `lint` - run ESLint
-- `test` - run Vitest test suite once
-- `test:watch` - run Vitest in watch mode
-
-## Environment Variables
-
-Create a `.env` file in the project root if you want custom endpoints:
-
-```bash
-VITE_NBA_API_BASE=https://site.api.espn.com/apis/site/v2/sports/basketball/nba
-VITE_NBA_CORE_BASE=https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba
-```
-
-## Project Structure
+## Architecture
 
 ```text
-src/
-  components/      # shared layout and UI composition
-  lib/             # API client and shared helpers
-  pages/           # route-level page components
-  App.tsx          # routing + providers
-  main.tsx         # application entry point
+                    ESPN APIs
+                         │
+                         ▼
+               Odin Data Service
+        (Ingestion, Caching, Analytics)
+                         │
+         ┌───────────────┴───────────────┐
+         │                               │
+         ▼                               ▼
+      REST API                    WebSocket Hub
+         │                               │
+         └───────────────┬───────────────┘
+                         │
+                         ▼
+                  Next.js Frontend
 ```
+
+---
+
+## Technology Stack
+
+### Backend
+
+- Odin
+- Native HTTP server
+- WebSockets
+- In-memory caching
+- Background workers
+
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Real-time WebSocket subscriptions
+
+### Data Sources
+
+- ESPN Public APIs
+
+---
+
+## Core Principles
+
+### Real-Time First
+
+Clients should receive updates instantly without polling.
+
+### Data Ownership
+
+External data is normalized and cached internally so clients never depend directly on third-party APIs.
+
+### Fast User Experience
+
+The backend acts as a high-performance data layer that serves clients from memory whenever possible.
+
+### Analytics Over News
+
+Focus on statistics, insights, comparisons, and simulations rather than articles and journalism.
+
+---
+
+## API Examples
+
+### Games
+
+```http
+GET /api/games/live
+GET /api/games/today
+GET /api/games/:id
+```
+
+### Teams
+
+```http
+GET /api/teams
+GET /api/teams/:id
+GET /api/teams/:id/roster
+GET /api/teams/:id/stats
+```
+
+### Players
+
+```http
+GET /api/players/:id
+GET /api/players/:id/stats
+```
+
+### Standings
+
+```http
+GET /api/standings
+```
+
+---
+
+## WebSocket Events
+
+### Game Updated
+
+```json
+{
+  "event": "game.updated",
+  "gameId": "401705871"
+}
+```
+
+### Team Updated
+
+```json
+{
+  "event": "team.updated",
+  "teamId": "14"
+}
+```
+
+### Standings Updated
+
+```json
+{
+  "event": "standings.updated"
+}
+```
+
+---
+
+## Roadmap
+
+### Phase 1 — Foundation
+
+- [ ] HTTP server
+- [ ] ESPN integration
+- [ ] JSON parsing
+- [ ] In-memory cache
+- [ ] Core API endpoints
+
+### Phase 2 — Real-Time Infrastructure
+
+- [ ] WebSocket server
+- [ ] Event broadcasting
+- [ ] Live score updates
+- [ ] Subscription system
+
+### Phase 3 — NBA Dashboard
+
+- [ ] Live games page
+- [ ] Standings page
+- [ ] Team pages
+- [ ] Player pages
+
+### Phase 4 — Analytics
+
+- [ ] Team comparisons
+- [ ] Advanced statistics
+- [ ] Power rankings
+- [ ] Historical trends
+
+### Phase 5 — Simulations
+
+- [ ] Season simulator
+- [ ] Playoff simulator
+- [ ] Lottery simulator
+- [ ] Trade machine
+
+### Phase 6 — We Really Know Ball
+
+- [ ] Prediction engine
+- [ ] Award forecasting
+- [ ] Team-building tools
+- [ ] Franchise management features
+- [ ] Did We Know Ball? prediction scoring
+
+---
+
+## Why Odin?
+
+We Know Ball uses Odin as a high-performance data platform rather than a traditional web framework.
+
+The backend is responsible for:
+
+- Data ingestion
+- Data normalization
+- Caching
+- Event streaming
+- Analytics
+- Simulations
+
+This allows the project to explore Odin's strengths in systems programming, performance, and data-oriented design while using modern web technologies for the user experience.
+
+---
+
+## Disclaimer
+
+We Know Ball is an independent project and is not affiliated with, endorsed by, or associated with the NBA, ESPN, or any NBA team.
+
+---
+
+## License
+
+MIT
