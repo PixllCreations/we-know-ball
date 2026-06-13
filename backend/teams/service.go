@@ -2,107 +2,55 @@ package teams
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
-	"net/http"
-	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type TeamService struct {
-	cache    *TeamCache
-	http     *http.Client
-	teamsURL string
+	cache   *TeamCache
+	fetcher Fetcher
 }
 
-func NewService(redis *redis.Client) *TeamService {
+func NewService(cache *TeamCache, fetcher Fetcher) *TeamService {
 	return &TeamService{
-		cache: NewCache(redis),
-		http: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-		teamsURL: ESPN_TEAMS_URL,
+		cache:   cache,
+		fetcher: fetcher,
 	}
 }
 
-func (ts *TeamService) fetchTeams(ctx context.Context) ([]TeamRef, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.teamsURL, nil)
-	if err != nil {
-		return nil, err
-	}
+/*
+==========================
 
-	response, err := ts.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	Teams API
 
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(
-			"unexpected status code: %d",
-			response.StatusCode,
-		)
-	}
-	defer response.Body.Close()
-
-	var data TeamsResponse
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		return nil, err
-	}
-
-	if len(data.Sports) == 0 || len(data.Sports[0].Leagues) == 0 {
-		return nil, errors.New("no sports or leagues found")
-	}
-
-	entries := data.Sports[0].Leagues[0].Teams
-	if len(entries) == 0 {
-		return nil, errors.New("no teams found")
-	}
-
-	teams := make([]TeamRef, 0, len(entries))
-	for _, entry := range entries {
-		team := entry.Team
-
-		if team.Logo == "" && len(team.Logos) > 0 {
-			team.Logo = team.Logos[0].Href
-		}
-
-		teams = append(teams, team)
-	}
-
-	return teams, nil
-}
+==========================
+*/
 
 func (ts *TeamService) GetTeams(ctx context.Context) ([]TeamRef, error) {
-
 	cached, err := ts.cache.GetTeams(ctx)
 	if err != nil {
 		if errors.Is(err, ErrCacheMiss) {
+			log.Println("cache miss, fetching teams from upstream")
 
-			teams, err := ts.fetchTeams(ctx)
-
+			fetched, err := ts.fetcher.FetchTeams(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			if err := ts.cache.SetTeams(ctx, teams); err != nil {
+			if err := ts.cache.SetTeams(ctx, fetched); err != nil {
 				log.Printf("failed to set teams in cache: %v", err)
 			}
 
-			return teams, nil
+			return fetched, nil
 		}
 		return nil, err
 	}
+
+	log.Println("cache hit, returning cached teams")
 	return cached, nil
 }
 
-func (ts *TeamService) GetTeam(
-	ctx context.Context,
-	id string,
-) (TeamRef, error) {
-
+func (ts *TeamService) GetTeam(ctx context.Context, id string) (TeamRef, error) {
 	teams, err := ts.GetTeams(ctx)
 	if err != nil {
 		return TeamRef{}, err
@@ -115,4 +63,28 @@ func (ts *TeamService) GetTeam(
 	}
 
 	return TeamRef{}, ErrTeamNotFound
+}
+
+/*
+==========================
+
+	Team Roster API
+
+==========================
+*/
+
+func (ts *TeamService) GetRoster(ctx context.Context, id string) ([]PlayerRef, error) {
+	return ts.fetcher.FetchRoster(ctx, id)
+}
+
+/*
+==========================
+
+	Team Schedule API
+
+==========================
+*/
+
+func (ts *TeamService) GetSchedule(ctx context.Context, id string) ([]GameRef, error) {
+	return ts.fetcher.FetchSchedule(ctx, id)
 }

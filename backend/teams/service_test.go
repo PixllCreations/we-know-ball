@@ -3,124 +3,53 @@ package teams
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
 
-func TestFetchTeamsSuccess(t *testing.T) {
-	service, cleanup := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Fatalf("method = %s, want %s", r.Method, http.MethodGet)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"sports": [{
-				"leagues": [{
-					"teams": [{
-						"team": {
-							"id": "1",
-							"abbreviation": "LAL",
-							"displayName": "Los Angeles Lakers",
-							"shortDisplayName": "Lakers",
-							"logos": [{"href": "https://example.com/lakers.png"}]
-						}
-					}]
-				}]
-			}]
-		}`))
-	}))
-	defer cleanup()
-
-	got, err := service.fetchTeams(context.Background())
-	if err != nil {
-		t.Fatalf("fetchTeams() error = %v", err)
-	}
-
-	if len(got) != 1 {
-		t.Fatalf("fetchTeams() returned %d teams, want 1", len(got))
-	}
-
-	if got[0].ID != "1" {
-		t.Fatalf("fetchTeams()[0].ID = %q, want %q", got[0].ID, "1")
-	}
-
-	if got[0].Logo != "https://example.com/lakers.png" {
-		t.Fatalf("fetchTeams()[0].Logo = %q, want fallback logo", got[0].Logo)
-	}
+type fakeFetcher struct {
+	teams         []TeamRef
+	roster        []PlayerRef
+	schedule      []GameRef
+	scheduleErr   error
+	teamsErr      error
+	rosterErr     error
+	teamsCalls    int
+	rosterCalls   int
+	scheduleCalls int
 }
 
-func TestFetchTeamsErrors(t *testing.T) {
-	tests := []struct {
-		name       string
-		statusCode int
-		body       string
-	}{
-		{
-			name:       "non 200 response",
-			statusCode: http.StatusInternalServerError,
-			body:       `{}`,
-		},
-		{
-			name:       "missing sports",
-			statusCode: http.StatusOK,
-			body:       `{}`,
-		},
-		{
-			name:       "missing leagues",
-			statusCode: http.StatusOK,
-			body:       `{"sports":[{}]}`,
-		},
-		{
-			name:       "empty teams",
-			statusCode: http.StatusOK,
-			body:       `{"sports":[{"leagues":[{"teams":[]}]}]}`,
-		},
-		{
-			name:       "invalid json",
-			statusCode: http.StatusOK,
-			body:       `{`,
-		},
+func (f *fakeFetcher) FetchTeams(ctx context.Context) ([]TeamRef, error) {
+	f.teamsCalls++
+	if f.teamsErr != nil {
+		return nil, f.teamsErr
 	}
+	return f.teams, nil
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			service, cleanup := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(tt.statusCode)
-				_, _ = w.Write([]byte(tt.body))
-			}))
-			defer cleanup()
-
-			if _, err := service.fetchTeams(context.Background()); err == nil {
-				t.Fatal("fetchTeams() error = nil, want error")
-			}
-		})
+func (f *fakeFetcher) FetchRoster(ctx context.Context, teamID string) ([]PlayerRef, error) {
+	f.rosterCalls++
+	if f.rosterErr != nil {
+		return nil, f.rosterErr
 	}
+	return f.roster, nil
+}
+
+func (f *fakeFetcher) FetchSchedule(ctx context.Context, teamID string) ([]GameRef, error) {
+	f.scheduleCalls++
+	if f.scheduleErr != nil {
+		return nil, f.scheduleErr
+	}
+	return f.schedule, nil
 }
 
 func TestGetTeamsFetchesAndCachesOnMiss(t *testing.T) {
-	calls := 0
-	service, cleanup := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"sports": [{
-				"leagues": [{
-					"teams": [{
-						"team": {
-							"id": "1",
-							"displayName": "Los Angeles Lakers",
-							"shortDisplayName": "Lakers"
-						}
-					}]
-				}]
-			}]
-		}`))
-	}))
+	fetcher := &fakeFetcher{
+		teams: []TeamRef{{ID: "1", DisplayName: "Los Angeles Lakers"}},
+	}
+	service, cleanup := newTestService(t, fetcher)
 	defer cleanup()
 
 	for i := 0; i < 2; i++ {
@@ -134,25 +63,31 @@ func TestGetTeamsFetchesAndCachesOnMiss(t *testing.T) {
 		}
 	}
 
-	if calls != 1 {
-		t.Fatalf("handler calls = %d, want 1", calls)
+	if fetcher.teamsCalls != 1 {
+		t.Fatalf("FetchTeams calls = %d, want 1", fetcher.teamsCalls)
+	}
+}
+
+func TestGetTeamsPropagatesFetcherError(t *testing.T) {
+	wantErr := errors.New("boom")
+	fetcher := &fakeFetcher{teamsErr: wantErr}
+	service, cleanup := newTestService(t, fetcher)
+	defer cleanup()
+
+	_, err := service.GetTeams(context.Background())
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("GetTeams() error = %v, want %v", err, wantErr)
 	}
 }
 
 func TestGetTeam(t *testing.T) {
-	service, cleanup := newTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"sports": [{
-				"leagues": [{
-					"teams": [
-						{"team": {"id": "1", "displayName": "Los Angeles Lakers"}},
-						{"team": {"id": "2", "displayName": "Boston Celtics"}}
-					]
-				}]
-			}]
-		}`))
-	}))
+	fetcher := &fakeFetcher{
+		teams: []TeamRef{
+			{ID: "1", DisplayName: "Los Angeles Lakers"},
+			{ID: "2", DisplayName: "Boston Celtics"},
+		},
+	}
+	service, cleanup := newTestService(t, fetcher)
 	defer cleanup()
 
 	got, err := service.GetTeam(context.Background(), "2")
@@ -170,7 +105,28 @@ func TestGetTeam(t *testing.T) {
 	}
 }
 
-func newTestService(t *testing.T, handler http.Handler) (*TeamService, func()) {
+func TestGetTeamRoster(t *testing.T) {
+	fetcher := &fakeFetcher{
+		roster: []PlayerRef{{ID: "100", DisplayName: "LeBron James"}},
+	}
+	service, cleanup := newTestService(t, fetcher)
+	defer cleanup()
+
+	got, err := service.GetRoster(context.Background(), "1")
+	if err != nil {
+		t.Fatalf("GetTeamRoster() error = %v", err)
+	}
+
+	if len(got) != 1 || got[0].ID != "100" {
+		t.Fatalf("GetTeamRoster() = %#v, want one player", got)
+	}
+
+	if fetcher.rosterCalls != 1 {
+		t.Fatalf("FetchRoster calls = %d, want 1", fetcher.rosterCalls)
+	}
+}
+
+func newTestService(t *testing.T, fetcher Fetcher) (*TeamService, func()) {
 	t.Helper()
 
 	redisServer := miniredis.RunT(t)
@@ -178,13 +134,9 @@ func newTestService(t *testing.T, handler http.Handler) (*TeamService, func()) {
 		Addr: redisServer.Addr(),
 	})
 
-	httpServer := httptest.NewServer(handler)
-	service := NewService(redisClient)
-	service.http = httpServer.Client()
-	service.teamsURL = httpServer.URL
+	service := NewService(NewCache(redisClient), fetcher)
 
 	return service, func() {
-		httpServer.Close()
 		if err := redisClient.Close(); err != nil {
 			t.Fatalf("redis client close error = %v", err)
 		}
