@@ -37,7 +37,7 @@ const Index = () => {
   // Update document title with live game count
   useEffect(() => {
     const live = data?.events?.filter((e) => e.status.type.state === "in").length ?? 0;
-    document.title = live ? `(${live} LIVE) HoopCenter — NBA` : "HoopCenter — NBA scores, standings & stats";
+    document.title = live ? `(${live} LIVE) We Know Ball — NBA` : "We Know Ball — NBA scores, standings & stats";
   }, [data]);
 
   const games = data?.events ?? [];
@@ -55,9 +55,7 @@ const Index = () => {
         <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">Scoreboard</p>
-            <h1 className="mt-2 font-display text-4xl font-bold tracking-tight md:text-5xl">
-              {prettyDate(date)}
-            </h1>
+            <h1 className="mt-2 font-display text-4xl font-bold tracking-tight md:text-5xl">{prettyDate(date)}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {games.length} game{games.length === 1 ? "" : "s"}
               {grouped.live.length > 0 && (
@@ -103,13 +101,19 @@ const Index = () => {
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-32" />
+            <Skeleton
+              key={i}
+              className="h-32"
+            />
           ))}
         </div>
       ) : isError ? (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-sm">
           Failed to load games.{" "}
-          <button onClick={() => refetch()} className="underline">
+          <button
+            onClick={() => refetch()}
+            className="underline"
+          >
             Retry
           </button>
         </div>
@@ -120,28 +124,47 @@ const Index = () => {
       ) : (
         <div className="space-y-8">
           {grouped.live.length > 0 && (
-            <Section title="Live now" tone="live" count={grouped.live.length}>
+            <Section
+              title="Live now"
+              tone="live"
+              count={grouped.live.length}
+            >
               <Grid>
                 {grouped.live.map((g) => (
-                  <GameCard key={g.id} game={g} />
+                  <GameCard
+                    key={g.id}
+                    game={g}
+                  />
                 ))}
               </Grid>
             </Section>
           )}
           {grouped.upcoming.length > 0 && (
-            <Section title="Upcoming" count={grouped.upcoming.length}>
+            <Section
+              title="Upcoming"
+              count={grouped.upcoming.length}
+            >
               <Grid>
                 {grouped.upcoming.map((g) => (
-                  <GameCard key={g.id} game={g} />
+                  <GameCard
+                    key={g.id}
+                    game={g}
+                  />
                 ))}
               </Grid>
             </Section>
           )}
           {grouped.final.length > 0 && (
-            <Section title="Final" count={grouped.final.length}>
+            <Section
+              title="Final"
+              count={grouped.final.length}
+            >
               <Grid>
                 {grouped.final.map((g) => (
-                  <GameCard key={g.id} game={g} />
+                  <GameCard
+                    key={g.id}
+                    game={g}
+                  />
                 ))}
               </Grid>
             </Section>
@@ -150,9 +173,7 @@ const Index = () => {
       )}
 
       {isFetching && !isLoading && (
-        <p className="text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          Refreshing…
-        </p>
+        <p className="text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Refreshing…</p>
       )}
     </div>
   );

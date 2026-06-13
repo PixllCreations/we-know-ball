@@ -29,7 +29,7 @@ const TeamPage = () => {
   if (teamQ.isLoading) return <Skeleton className="h-72" />;
   if (teamQ.isError || !teamQ.data) return <p className="text-destructive">Failed to load team.</p>;
 
-  const team = teamQ.data.team;
+  const team = teamQ.data;
   const summary = team.record?.items?.[0]?.summary;
   const stats = team.record?.items?.[0]?.stats ?? [];
   const accent = team.color ? `#${team.color}` : "hsl(var(--primary))";
@@ -59,9 +59,7 @@ const TeamPage = () => {
             />
           )}
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {team.location}
-            </p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">{team.location}</p>
             <h1 className="mt-1 font-display text-5xl font-bold tracking-tight">{team.name}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
               {summary && (
@@ -69,9 +67,7 @@ const TeamPage = () => {
                   {summary}
                 </span>
               )}
-              {team.standingSummary && (
-                <span className="text-muted-foreground">{team.standingSummary}</span>
-              )}
+              {team.standingSummary && <span className="text-muted-foreground">{team.standingSummary}</span>}
             </div>
           </div>
         </div>
@@ -85,9 +81,7 @@ const TeamPage = () => {
               key={s.name}
               className="rounded-lg border border-border bg-gradient-stat p-4"
             >
-              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                {s.name}
-              </div>
+              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{s.name}</div>
               <div className="mt-1 tabular font-display text-2xl font-bold">{s.value}</div>
             </div>
           ))}
@@ -117,14 +111,12 @@ const TeamPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {rosterQ.data?.athletes?.map((p) => (
+                  {rosterQ.data?.map((p) => (
                     <tr
                       key={p.id}
                       className="border-b border-border/60 last:border-0 hover:bg-surface-hover"
                     >
-                      <td className="px-4 py-2 font-mono text-xs text-muted-foreground">
-                        {p.jersey ?? "—"}
-                      </td>
+                      <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{p.jersey ?? "—"}</td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2.5">
                           {p.headshot?.href ? (
@@ -140,9 +132,7 @@ const TeamPage = () => {
                           <span className="font-medium">{p.displayName}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {p.position?.abbreviation ?? "—"}
-                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{p.position?.abbreviation ?? "—"}</td>
                       <td className="px-3 py-2 text-right">{inchesToFeet(p.height)}</td>
                       <td className="px-3 py-2 text-right">{p.weight ? `${p.weight}` : "—"}</td>
                       <td className="px-3 py-2 text-right">{p.age ?? "—"}</td>
@@ -163,7 +153,7 @@ const TeamPage = () => {
             <Skeleton className="h-96" />
           ) : (
             <div className="space-y-2">
-              {scheduleQ.data?.events?.slice(0, 12).map((g) => {
+              {scheduleQ.data?.slice(0, 12).map((g) => {
                 const comp = g.competitions?.[0];
                 if (!comp) return null;
                 const opp = comp.competitors?.find((c) => c.team.id !== id);
@@ -188,8 +178,7 @@ const TeamPage = () => {
                       )}
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">
-                          <span className="text-muted-foreground">{isHome ? "vs" : "@"}</span>{" "}
-                          {opp?.team.abbreviation}
+                          <span className="text-muted-foreground">{isHome ? "vs" : "@"}</span> {opp?.team.abbreviation}
                         </div>
                         <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                           {formatGameDate(g.date)}

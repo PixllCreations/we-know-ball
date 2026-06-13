@@ -12,10 +12,8 @@ const Teams = () => {
   });
 
   const teams = useMemo(() => {
-    const list = data?.sports?.[0]?.leagues?.[0]?.teams?.map((t) => t.team) ?? [];
-    const filtered = q
-      ? list.filter((t) => t.displayName.toLowerCase().includes(q.toLowerCase()))
-      : list;
+    const list = data ?? [];
+    const filtered = q ? list.filter((t) => t.displayName.toLowerCase().includes(q.toLowerCase())) : list;
     return [...filtered].sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [data, q]);
 
@@ -37,7 +35,10 @@ const Teams = () => {
       {isLoading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 30 }).map((_, i) => (
-            <Skeleton key={i} className="h-36" />
+            <Skeleton
+              key={i}
+              className="h-36"
+            />
           ))}
         </div>
       ) : isError ? (
