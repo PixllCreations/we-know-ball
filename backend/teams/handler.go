@@ -7,17 +7,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type TeamHandler struct {
-	service *TeamService
+type Handler struct {
+	service *Service
 }
 
-func NewTeamHandler(s *TeamService) *TeamHandler {
-	return &TeamHandler{
+func NewHandler(s *Service) *Handler {
+	return &Handler{
 		service: s,
 	}
 }
 
-func (h *TeamHandler) GetTeam(c *gin.Context) {
+func (h *Handler) GetTeam(c *gin.Context) {
 
 	id := c.Param("id")
 	team, err := h.service.GetTeam(
@@ -33,7 +33,7 @@ func (h *TeamHandler) GetTeam(c *gin.Context) {
 	c.JSON(http.StatusOK, team)
 }
 
-func (h *TeamHandler) GetTeams(c *gin.Context) {
+func (h *Handler) GetTeams(c *gin.Context) {
 
 	teams, err := h.service.GetTeams(
 		c.Request.Context(),
@@ -47,7 +47,7 @@ func (h *TeamHandler) GetTeams(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
-func (h *TeamHandler) GetRoster(c *gin.Context) {
+func (h *Handler) GetRoster(c *gin.Context) {
 	id := c.Param("id")
 	roster, err := h.service.GetRoster(
 		c.Request.Context(),
@@ -62,7 +62,7 @@ func (h *TeamHandler) GetRoster(c *gin.Context) {
 	c.JSON(http.StatusOK, roster)
 }
 
-func (h *TeamHandler) GetSchedule(c *gin.Context) {
+func (h *Handler) GetSchedule(c *gin.Context) {
 	id := c.Param("id")
 	schedule, err := h.service.GetSchedule(c.Request.Context(), id)
 	if err != nil {
@@ -73,7 +73,7 @@ func (h *TeamHandler) GetSchedule(c *gin.Context) {
 	c.JSON(http.StatusOK, schedule)
 }
 
-func (h *TeamHandler) SetupRoutes(r *gin.RouterGroup) {
+func (h *Handler) SetupRoutes(r *gin.RouterGroup) {
 	r.GET("/teams/:id", h.GetTeam)
 	r.GET("/teams", h.GetTeams)
 	r.GET("/teams/:id/roster", h.GetRoster)

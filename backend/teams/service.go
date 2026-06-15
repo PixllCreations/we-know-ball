@@ -4,17 +4,22 @@ import (
 	"context"
 	"errors"
 	"log"
+
+	"github.com/PixllCreations/we-know-ball/backend/cache"
+	"github.com/PixllCreations/we-know-ball/backend/games"
 )
 
-type TeamService struct {
-	cache   *TeamCache
-	fetcher Fetcher
+type Service struct {
+	teamCache *TeamCache
+	gameCache *games.GameCache
+	fetcher   Fetcher
 }
 
-func NewService(cache *TeamCache, fetcher Fetcher) *TeamService {
-	return &TeamService{
-		cache:   cache,
-		fetcher: fetcher,
+func NewService(teamCache *TeamCache, gameCache *games.GameCache, fetcher Fetcher) *Service {
+	return &Service{
+		teamCache: teamCache,
+		gameCache: gameCache,
+		fetcher:   fetcher,
 	}
 }
 
@@ -26,10 +31,10 @@ func NewService(cache *TeamCache, fetcher Fetcher) *TeamService {
 ==========================
 */
 
-func (ts *TeamService) GetTeams(ctx context.Context) ([]TeamRef, error) {
-	cached, err := ts.cache.GetTeams(ctx)
+func (ts *Service) GetTeams(ctx context.Context) ([]Team, error) {
+	cached, err := ts.teamCache.GetTeams(ctx)
 	if err != nil {
-		if errors.Is(err, ErrCacheMiss) {
+		if errors.Is(err, cache.ErrCacheMiss) {
 			log.Println("cache miss, fetching teams from upstream")
 
 			fetched, err := ts.fetcher.FetchTeams(ctx)
@@ -37,7 +42,7 @@ func (ts *TeamService) GetTeams(ctx context.Context) ([]TeamRef, error) {
 				return nil, err
 			}
 
-			if err := ts.cache.SetTeams(ctx, fetched); err != nil {
+			if err := ts.teamCache.SetTeams(ctx, fetched); err != nil {
 				log.Printf("failed to set teams in cache: %v", err)
 			}
 
@@ -50,10 +55,10 @@ func (ts *TeamService) GetTeams(ctx context.Context) ([]TeamRef, error) {
 	return cached, nil
 }
 
-func (ts *TeamService) GetTeam(ctx context.Context, id string) (TeamRef, error) {
+func (ts *Service) GetTeam(ctx context.Context, id string) (Team, error) {
 	teams, err := ts.GetTeams(ctx)
 	if err != nil {
-		return TeamRef{}, err
+		return Team{}, err
 	}
 
 	for _, team := range teams {
@@ -62,7 +67,7 @@ func (ts *TeamService) GetTeam(ctx context.Context, id string) (TeamRef, error) 
 		}
 	}
 
-	return TeamRef{}, ErrTeamNotFound
+	return Team{}, ErrTeamNotFound
 }
 
 /*
@@ -73,8 +78,24 @@ func (ts *TeamService) GetTeam(ctx context.Context, id string) (TeamRef, error) 
 ==========================
 */
 
-func (ts *TeamService) GetRoster(ctx context.Context, id string) ([]PlayerRef, error) {
-	return ts.fetcher.FetchRoster(ctx, id)
+func (ts *Service) GetRoster(ctx context.Context, id string) ([]Player, error) {
+	cached, err := ts.teamCache.GetRoster(ctx, id)
+	if err != nil {
+		if errors.Is(err, cache.ErrCacheMiss) {
+			log.Println("cache miss, fetching roster from upstream")
+			fetched, err := ts.fetcher.FetchRoster(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if err := ts.teamCache.SetRoster(ctx, id, fetched); err != nil {
+				log.Printf("failed to set roster in cache: %v", err)
+			}
+			return fetched, nil
+		}
+		return nil, err
+	}
+	log.Println("cache hit, returning cached roster")
+	return cached, nil
 }
 
 /*
@@ -85,6 +106,22 @@ func (ts *TeamService) GetRoster(ctx context.Context, id string) ([]PlayerRef, e
 ==========================
 */
 
-func (ts *TeamService) GetSchedule(ctx context.Context, id string) ([]GameRef, error) {
-	return ts.fetcher.FetchSchedule(ctx, id)
+func (ts *Service) GetSchedule(ctx context.Context, id string) ([]games.Game, error) {
+	cached, err := ts.gameCache.GetTeamGames(ctx, id)
+
+	if err != nil {
+		if errors.Is(err, cache.ErrCacheMiss) {
+			log.Println("cache miss, fetching schedule from upstream")
+			fetched, err := ts.fetcher.FetchSchedule(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if err := ts.gameCache.SetTeamGames(ctx, id, fetched); err != nil {
+				log.Printf("failed to set schedule in cache: %v", err)
+			}
+			return fetched, nil
+		}
+	}
+	log.Println("cache hit, returning cached schedule")
+	return cached, nil
 }

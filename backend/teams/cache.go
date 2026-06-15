@@ -2,63 +2,65 @@ package teams
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/PixllCreations/we-know-ball/backend/cache"
 )
 
 var (
-	ErrCacheMiss    = errors.New("cache miss")
-	ErrUnmarshal    = errors.New("unmarshal error")
 	ErrTeamNotFound = errors.New("team not found")
 )
 
 type TeamCache struct {
+	cache *cache.Cache
 	key   string
-	redis *redis.Client
 	ttl   time.Duration
 }
 
-func NewCache(redis *redis.Client) *TeamCache {
+func NewCache(c *cache.Cache) *TeamCache {
 	return &TeamCache{
-		redis: redis,
+		cache: c,
 		key:   "teams",
 		ttl:   24 * time.Hour,
 	}
 }
 
-func (tc *TeamCache) load(ctx context.Context) ([]TeamRef, error) {
-	val, err := tc.redis.Get(ctx, tc.key).Result()
+func (tc *TeamCache) GetTeams(
+	ctx context.Context,
+) ([]Team, error) {
+	var teams []Team
 
-	if errors.Is(err, redis.Nil) {
-		return nil, ErrCacheMiss
-	}
-
-	teams, err := parseTeams(val)
-	if err != nil {
+	if err := tc.cache.Get(
+		ctx,
+		tc.key,
+		&teams,
+	); err != nil {
 		return nil, err
 	}
 
 	return teams, nil
 }
 
-func (tc *TeamCache) save(ctx context.Context, teams []TeamRef) error {
-	encoded, err := encodeTeams(teams)
-	if err != nil {
-		return err
-	}
-
-	return tc.redis.Set(ctx, tc.key, encoded, tc.ttl).Err()
+func (tc *TeamCache) SetTeams(
+	ctx context.Context,
+	teams []Team,
+) error {
+	return tc.cache.Set(
+		ctx,
+		tc.key,
+		teams,
+		tc.ttl,
+	)
 }
 
-func (tc *TeamCache) GetTeam(ctx context.Context, id string) (TeamRef, error) {
-	teams, err := tc.load(ctx)
-
+func (tc *TeamCache) GetTeam(
+	ctx context.Context,
+	id string,
+) (Team, error) {
+	teams, err := tc.GetTeams(ctx)
 	if err != nil {
-		return TeamRef{}, err
+		return Team{}, err
 	}
 
 	for _, team := range teams {
@@ -67,27 +69,19 @@ func (tc *TeamCache) GetTeam(ctx context.Context, id string) (TeamRef, error) {
 		}
 	}
 
-	return TeamRef{}, ErrTeamNotFound
+	return Team{}, ErrTeamNotFound
 }
 
-func (tc *TeamCache) SetTeams(ctx context.Context, teams []TeamRef) error {
-	return tc.save(ctx, teams)
-}
+func (tc *TeamCache) GetRoster(ctx context.Context, teamID string) ([]Player, error) {
+	var roster []Player
 
-func (tc *TeamCache) GetTeams(ctx context.Context) ([]TeamRef, error) {
-	return tc.load(ctx)
-}
-
-func parseTeams(data string) ([]TeamRef, error) {
-	var teams []TeamRef
-
-	if err := json.Unmarshal([]byte(data), &teams); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrUnmarshal, err)
+	if err := tc.cache.Get(ctx, "roster:"+teamID, &roster); err != nil {
+		return nil, err
 	}
 
-	return teams, nil
+	return roster, nil
 }
 
-func encodeTeams(teams []TeamRef) ([]byte, error) {
-	return json.Marshal(teams)
+func (tc *TeamCache) SetRoster(ctx context.Context, teamID string, roster []Player) error {
+	return tc.cache.Set(ctx, "roster:"+teamID, roster, tc.ttl)
 }
