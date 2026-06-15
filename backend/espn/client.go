@@ -6,16 +6,29 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/PixllCreations/we-know-ball/backend/games"
+	"github.com/PixllCreations/we-know-ball/backend/nba"
 	"github.com/PixllCreations/we-know-ball/backend/teams"
 )
 
-const defaultBaseURL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams"
+const (
+	SiteV2Base = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+	CoreV2Base = "https://site.api.espn.com/apis/v2/sports/basketball/nba"
+)
+
+var (
+	_ teams.Fetcher = (*Client)(nil)
+	_ games.Fetcher = (*Client)(nil)
+	_ nba.Fetcher   = (*Client)(nil)
+)
 
 type Client struct {
-	http    *http.Client
-	baseURL string
+	http *http.Client
 }
 
 func NewClient() *Client {
@@ -23,28 +36,39 @@ func NewClient() *Client {
 		http: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		baseURL: defaultBaseURL,
 	}
 }
 
-func (c *Client) FetchTeams(ctx context.Context) ([]teams.TeamRef, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL, nil)
+func joinEndpoint(baseURL, path string) string {
+	return strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(path, "/")
+}
+
+func (c *Client) get(ctx context.Context, baseURL, path string, query url.Values, target any) error {
+	endpoint := joinEndpoint(baseURL, path)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	if len(query) > 0 {
+		req.URL.RawQuery = query.Encode()
 	}
 
-	response, err := c.http.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer response.Body.Close()
+	defer resp.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
+	return json.NewDecoder(resp.Body).Decode(target)
+}
 
-	var data teamsResponse
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
+func (c *Client) FetchTeams(ctx context.Context) ([]teams.Team, error) {
+	var data TeamsResponse
+	if err := c.get(ctx, SiteV2Base, "/teams", nil, &data); err != nil {
 		return nil, err
 	}
 
@@ -57,64 +81,65 @@ func (c *Client) FetchTeams(ctx context.Context) ([]teams.TeamRef, error) {
 		return nil, errors.New("no teams found")
 	}
 
-	result := make([]teams.TeamRef, 0, len(entries))
+	wire := make([]Team, 0, len(entries))
 	for _, entry := range entries {
-		team := entry.Team
-		if team.Logo == "" && len(team.Logos) > 0 {
-			team.Logo = team.Logos[0].Href
-		}
-		result = append(result, team)
+		wire = append(wire, entry.Team)
 	}
-
-	return result, nil
+	return mapTeams(wire), nil
 }
 
-func (c *Client) FetchRoster(ctx context.Context, teamID string) ([]teams.PlayerRef, error) {
-	url := fmt.Sprintf("%s/%s/roster", c.baseURL, teamID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
+func (c *Client) FetchRoster(ctx context.Context, teamID string) ([]teams.Player, error) {
+	var data RosterResponse
+	if err := c.get(ctx, SiteV2Base, "/teams/"+teamID+"/roster", nil, &data); err != nil {
 		return nil, err
 	}
-
-	response, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
-	}
-
-	var data rosterResponse
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		return nil, err
-	}
-
-	return data.Athletes, nil
+	return mapPlayers(data.Athletes), nil
 }
 
-func (c *Client) FetchSchedule(ctx context.Context, teamID string) ([]teams.GameRef, error) {
-	url := fmt.Sprintf("%s/%s/schedule", c.baseURL, teamID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (c *Client) FetchSchedule(ctx context.Context, teamID string) ([]games.Game, error) {
+	var data ScheduleResponse
+	if err := c.get(ctx, SiteV2Base, "/teams/"+teamID+"/schedule", nil, &data); err != nil {
+		return nil, err
+	}
+	return mapSchedule(&data), nil
+}
+
+// `date` is YYYYMMDD or a YYYYMMDD-YYYYMMDD range
+func (c *Client) FetchScoreboard(ctx context.Context, date string) ([]games.Game, error) {
+	var query url.Values
+	if date != "" {
+		query = url.Values{"dates": []string{date}}
+	}
+	var data ScoreboardResponse
+	if err := c.get(ctx, SiteV2Base, "/scoreboard", query, &data); err != nil {
+		return nil, err
+	}
+
+	return mapScoreboard(&data), nil
+}
+
+func (c *Client) FetchGame(ctx context.Context, id string) (games.Game, error) {
+	var data ScoreboardEvent
+	if err := c.get(ctx, SiteV2Base, "/events/summary", url.Values{"event": []string{id}}, &data); err != nil {
+		return games.Game{}, err
+	}
+	return mapScoreboardEvent(data), nil
+}
+
+func (c *Client) FetchStandings(ctx context.Context) ([]nba.ConferenceStandings, error) {
+	var data StandingsResponse
+	if err := c.get(ctx, CoreV2Base, "/standings", nil, &data); err != nil {
+		return nil, err
+	}
+
+	return mapStandings(&data), nil
+}
+
+// SaveDebugData is a development helper for capturing raw payloads.
+func SaveDebugData(data any, filename string) error {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	response, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
-	}
-
-	var data scheduleResponse
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		return nil, err
-	}
-
-	return data.Events, nil
+	return os.WriteFile(filename, jsonData, 0600)
 }
