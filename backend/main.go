@@ -1,33 +1,39 @@
 package main
 
 import (
-	"context"
-
+	"github.com/PixllCreations/we-know-ball/backend/cache"
 	"github.com/PixllCreations/we-know-ball/backend/espn"
+	"github.com/PixllCreations/we-know-ball/backend/games"
+	"github.com/PixllCreations/we-know-ball/backend/nba"
 	"github.com/PixllCreations/we-know-ball/backend/teams"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 func main() {
-	rdb := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
+	rdb := NewClient()
 	defer rdb.Close()
 
-	c := teams.NewCache(rdb)
-	espn := espn.NewClient()
+	cache := cache.New(rdb)
+	tc := teams.NewCache(cache)
+	gc := games.NewCache(cache)
+	nc := nba.NewCache(cache)
 
-	espn.FetchSchedule(context.Background(), "1")
+	espnClient := espn.NewClient()
 
-	ts := teams.NewService(c, espn)
+	ts := teams.NewService(tc, gc, espnClient)
+	gs := games.NewService(gc, espnClient)
+	ns := nba.NewService(nc, espnClient)
 
-	th := teams.NewTeamHandler(ts)
+	th := teams.NewHandler(ts)
+	gh := games.NewHandler(gs)
+	nh := nba.NewHandler(ns)
 
 	r := gin.Default()
 	api := r.Group("/api/nba")
 
 	th.SetupRoutes(api)
+	gh.SetupRoutes(api)
+	nh.SetupRoutes(api)
 
 	r.Run(":8081")
 
