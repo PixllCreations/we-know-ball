@@ -14,6 +14,8 @@ interface Props {
   game: Game;
 }
 
+const participantLogo = (logo?: string, logos?: { href: string }[]) => logo ?? logos?.[0]?.href;
+
 const TeamRow = ({
   logo,
   abbr,
@@ -65,16 +67,11 @@ const TeamRow = ({
 );
 
 const GameCard = ({ game }: Props) => {
-  const comp = game.competitions[0];
-  const home = comp.competitors.find((c) => c.homeAway === "home")!;
-  const away = comp.competitors.find((c) => c.homeAway === "away")!;
-  const state = game.status.type.state;
+  const { home, away } = game;
+  const state = game.state;
   const isLive = state === "in";
   const isFinal = state === "post";
   const showWatchOptions = !isFinal;
-  const broadcast = comp.broadcasts?.[0]?.names?.[0];
-  const broadcastOptions = comp.broadcasts?.flatMap((b) => b.names ?? []).filter(Boolean) ?? [];
-  const uniqueBroadcasts = Array.from(new Set(broadcastOptions));
 
   return (
     <div
@@ -97,28 +94,27 @@ const GameCard = ({ game }: Props) => {
                 isFinal && "text-foreground",
               )}
             >
-              {game.status.type.shortDetail}
+              {game.shortDetail}
             </span>
           </div>
-          {broadcast && <span className="text-muted-foreground">{broadcast}</span>}
         </div>
 
         <div className="divide-y divide-border/50">
           <TeamRow
-            logo={away.team.logo}
-            abbr={away.team.abbreviation}
-            name={away.team.shortDisplayName}
-            record={away.records?.[0]?.summary}
-            score={away.score}
+            logo={participantLogo(away.logo, away.logos)}
+            abbr={away.abbreviation}
+            name={away.displayName}
+            record={away.records?.[0]?.displayValue}
+            score={away.score ?? ""}
             isWinner={!!away.winner}
             isLive={isLive}
           />
           <TeamRow
-            logo={home.team.logo}
-            abbr={home.team.abbreviation}
-            name={home.team.shortDisplayName}
-            record={home.records?.[0]?.summary}
-            score={home.score}
+            logo={participantLogo(home.logo, home.logos)}
+            abbr={home.abbreviation}
+            name={home.displayName}
+            record={home.records?.[0]?.displayValue}
+            score={home.score ?? ""}
             isWinner={!!home.winner}
             isLive={isLive}
           />
@@ -143,24 +139,10 @@ const GameCard = ({ game }: Props) => {
                   {isLive ? "Watch Live" : "Stream Options"}
                 </DialogTitle>
                 <DialogDescription>
-                  {away.team.abbreviation} at {home.team.abbreviation}
+                  {away.abbreviation} at {home.abbreviation}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2">
-                {uniqueBroadcasts.map((name) => (
-                  <a
-                    key={name}
-                    href={`https://www.google.com/search?q=${encodeURIComponent(`${name} NBA live stream`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/15 hover:text-primary"
-                  >
-                    <span>{name}</span>
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      Open
-                    </span>
-                  </a>
-                ))}
                 <a
                   href="https://www.espn.com/watch/"
                   target="_blank"

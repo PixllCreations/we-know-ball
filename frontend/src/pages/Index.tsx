@@ -36,15 +36,15 @@ const Index = () => {
 
   // Update document title with live game count
   useEffect(() => {
-    const live = data?.events?.filter((e) => e.status.type.state === "in").length ?? 0;
+    const live = data?.filter((g) => g.state === "in").length ?? 0;
     document.title = live ? `(${live} LIVE) We Know Ball — NBA` : "We Know Ball — NBA scores, standings & stats";
   }, [data]);
 
-  const games = data?.events ?? [];
+  const games = data ?? [];
   const grouped = useMemo(() => {
-    const live = games.filter((g) => g.status.type.state === "in");
-    const upcoming = games.filter((g) => g.status.type.state === "pre");
-    const final = games.filter((g) => g.status.type.state === "post");
+    const live = games.filter((g) => g.state === "in");
+    const upcoming = games.filter((g) => g.state === "pre");
+    const final = games.filter((g) => g.state === "post");
     return { live, upcoming, final };
   }, [games]);
 

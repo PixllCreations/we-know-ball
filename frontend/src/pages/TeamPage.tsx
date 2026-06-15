@@ -154,13 +154,10 @@ const TeamPage = () => {
           ) : (
             <div className="space-y-2">
               {scheduleQ.data?.slice(0, 12).map((g) => {
-                const comp = g.competitions?.[0];
-                if (!comp) return null;
-                const opp = comp.competitors?.find((c) => c.team.id !== id);
-                const me = comp.competitors?.find((c) => c.team.id === id);
-                const isHome = me?.homeAway === "home";
-                const state = g.status?.type?.state;
-                const won = me?.winner;
+                const isHome = g.home.id === id;
+                const me = isHome ? g.home : g.away;
+                const opp = isHome ? g.away : g.home;
+                const won = me.winner;
                 return (
                   <Link
                     key={g.id}
@@ -168,9 +165,9 @@ const TeamPage = () => {
                     className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3 transition-colors hover:bg-surface-hover"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      {opp?.team.logo && (
+                      {opp.logo && (
                         <img
-                          src={opp.team.logo}
+                          src={opp.logo}
                           alt=""
                           className="h-8 w-8 object-contain"
                           loading="lazy"
@@ -178,14 +175,14 @@ const TeamPage = () => {
                       )}
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">
-                          <span className="text-muted-foreground">{isHome ? "vs" : "@"}</span> {opp?.team.abbreviation}
+                          <span className="text-muted-foreground">{isHome ? "vs" : "@"}</span> {opp.abbreviation}
                         </div>
                         <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                           {formatGameDate(g.date)}
                         </div>
                       </div>
                     </div>
-                    {state === "post" ? (
+                    {g.state === "post" ? (
                       <div
                         className={cn(
                           "text-right tabular text-sm font-semibold",
@@ -194,12 +191,12 @@ const TeamPage = () => {
                       >
                         <div>{won ? "W" : "L"}</div>
                         <div className="font-mono text-[10px]">
-                          {me?.score}-{opp?.score}
+                          {me.score}-{opp.score}
                         </div>
                       </div>
                     ) : (
                       <div className="font-mono text-[10px] uppercase text-muted-foreground">
-                        {g.status?.type?.shortDetail ?? formatGameDate(g.date)}
+                        {g.shortDetail ?? formatGameDate(g.date)}
                       </div>
                     )}
                   </Link>

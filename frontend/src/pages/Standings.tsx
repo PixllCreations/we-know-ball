@@ -108,7 +108,7 @@ const Standings = () => {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
-          {data.children.map((conf) => (
+          {data.map((conf) => (
             <ConferenceTable
               key={conf.abbreviation}
               name={`${conf.name}ern Conference`.replace(/ernern/, "ern")}

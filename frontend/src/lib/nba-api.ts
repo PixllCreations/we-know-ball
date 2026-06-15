@@ -20,7 +20,7 @@ const routes = {
   team: (id: string) => `teams/${id}`,
   teamRoster: (id: string) => `teams/${id}/roster`,
   teamSchedule: (id: string) => `teams/${id}/schedule`,
-  summary: () => "summary",
+  games: (id: string) => `games/${id}`,
   standings: () => "standings",
 } as const;
 
@@ -42,7 +42,7 @@ async function request<T>(path: string, params?: Record<string, string | undefin
 
 /* ---------- Types (narrow subset of ESPN's response we actually use) ---------- */
 
-export interface TeamRef {
+export interface Team {
   id: string;
   abbreviation: string;
   displayName: string;
@@ -61,7 +61,7 @@ export interface Competitor {
   homeAway: "home" | "away";
   score: string;
   winner?: boolean;
-  team: TeamRef;
+  team: Team;
   records?: { summary: string; type: string }[];
   linescores?: { value: number }[];
 }
@@ -81,27 +81,52 @@ export interface GameStatus {
   };
 }
 
+export interface GameParticipant {
+  id: string;
+  abbreviation: string;
+  displayName: string;
+  logo?: string;
+  logos?: { href: string }[];
+  score?: string;
+  winner?: boolean;
+  records?: { type: string; displayValue: string }[];
+}
+
+export interface GameLeader {
+  category: string;
+  displayName: string;
+  abbreviation?: string;
+  value: string;
+  athleteId?: string;
+  athlete: string;
+}
+
+/** Shared flat game shape returned by scoreboard and team schedule endpoints. */
 export interface Game {
   id: string;
   date: string;
   name: string;
   shortName: string;
-  status: GameStatus;
-  competitions: {
-    id: string;
-    venue?: { fullName: string; address?: { city: string; state: string } };
-    competitors: Competitor[];
-    broadcasts?: { names: string[] }[];
-  }[];
-}
-
-export interface ScoreboardResponse {
-  events: Game[];
-  day?: { date: string };
+  state: "pre" | "in" | "post" | "";
+  status: string;
+  shortDetail?: string;
+  detail?: string;
+  completed: boolean;
+  clock?: number;
+  displayClock?: string;
+  period?: number;
+  headline?: string;
+  venue?: { fullName: string; city?: string; state?: string };
+  attendance?: number;
+  neutralSite?: boolean;
+  home: GameParticipant;
+  away: GameParticipant;
+  leaders?: GameLeader[];
+  notes?: { type: string; headline: string }[];
 }
 
 export interface StandingsTeam {
-  team: TeamRef;
+  team: Team;
   stats: { name: string; abbreviation?: string; displayValue: string; value?: number }[];
 }
 
@@ -112,7 +137,7 @@ export interface ConferenceStandings {
 }
 
 /** Team detail as returned by `GET teams/:id` (`record` is an object here, unlike the string on list views). */
-export type TeamDetail = Omit<TeamRef, "record"> & {
+export type TeamDetail = Omit<Team, "record"> & {
   record?: { items: { summary: string; stats: { name: string; value: number }[] }[] };
   nextEvent?: Game[];
   standingSummary?: string;
@@ -140,10 +165,6 @@ export interface TeamRosterResponse {
   athletes: RosterAthlete[];
 }
 
-export interface TeamScheduleResponse {
-  events: Game[];
-}
-
 export interface BoxscorePlayerAthleteStatLine {
   athlete: {
     id: string;
@@ -159,11 +180,11 @@ export interface BoxscorePlayerAthleteStatLine {
 }
 
 export interface GameSummaryResponse {
-  header: { competitions: { competitors: Competitor[]; status: GameStatus }[] };
+  competitions: { competitors: Competitor[]; status: GameStatus }[];
   boxscore?: {
-    teams: { team: TeamRef; statistics: { name: string; displayValue: string; label: string }[] }[];
+    teams: { team: Team; statistics: { name: string; displayValue: string; label: string }[] }[];
     players?: {
-      team: TeamRef;
+      team: Team;
       statistics: {
         names: string[];
         athletes: BoxscorePlayerAthleteStatLine[];
@@ -172,7 +193,7 @@ export interface GameSummaryResponse {
   };
   gameInfo?: { venue?: { fullName: string; address?: { city: string; state: string } }; attendance?: number };
   leaders?: {
-    team: TeamRef;
+    team: Team;
     leaders: {
       name: string;
       displayName: string;
@@ -181,11 +202,6 @@ export interface GameSummaryResponse {
   }[];
 }
 
-export interface StandingsResponse {
-  children: ConferenceStandings[];
-}
-
-/** One documented ESPN-backed response shape this app unmarshals into. */
 export interface EspnApiStructureSpec {
   /** Stable id for codegen / backend route mapping */
   endpointId: keyof typeof routes;
@@ -199,32 +215,28 @@ export interface EspnApiStructureSpec {
 
 /* ---------- Endpoints ---------- */
 
-export function getScoreboard(yyyymmdd?: string) {
-  return request<ScoreboardResponse>(routes.scoreboard(), { dates: yyyymmdd }).then((data) => {
-    if (import.meta.env.DEV) {
-      console.groupCollapsed(`[ESPN scoreboard] ${yyyymmdd ?? "today"} - ${data.events?.length ?? 0} games`);
-      for (const event of data.events ?? []) {
-        const comp = event.competitions?.[0];
-        const debugComp = comp as (Game["competitions"][number] & ScoreboardDebugEventExtras) | undefined;
-        const debugEvent = event as Game & ScoreboardDebugEventExtras;
-        console.log({
-          id: event.id,
-          name: event.name,
-          state: event.status?.type?.state,
-          statusDetail: event.status?.type?.shortDetail,
-          broadcasts: comp?.broadcasts,
-          geoBroadcasts: debugComp?.geoBroadcasts,
-          links: debugEvent.links,
-        });
-      }
-      console.groupEnd();
+export async function getScoreboard(yyyymmdd?: string) {
+  const games = await request<Game[]>(routes.scoreboard(), { dates: yyyymmdd });
+
+  if (import.meta.env.DEV) {
+    console.groupCollapsed(`[scoreboard] ${yyyymmdd ?? "today"} - ${games.length} games`);
+    for (const game of games) {
+      const debugGame = game as Game & ScoreboardDebugEventExtras;
+      console.log({
+        id: game.id,
+        name: game.name,
+        state: game.state,
+        statusDetail: game.shortDetail,
+        links: debugGame.links,
+      });
     }
-    return data;
-  });
+    console.groupEnd();
+  }
+  return games;
 }
 
 export function getTeams() {
-  return request<TeamRef[]>(routes.teams());
+  return request<Team[]>(routes.teams());
 }
 
 export function getTeam(id: string) {
@@ -239,12 +251,12 @@ export function getTeamSchedule(id: string) {
   return request<Game[]>(routes.teamSchedule(id));
 }
 
-export function getGameSummary(eventId: string) {
-  return request<GameSummaryResponse>(routes.summary(), { event: eventId });
+export function getGame(id: string) {
+  return request<Game>(routes.games(id));
 }
 
 export function getStandings() {
-  return request<StandingsResponse>(routes.standings());
+  return request<ConferenceStandings[]>(routes.standings());
 }
 
 /* ---------- Helpers ---------- */
