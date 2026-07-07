@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	rdb := NewClient()
+	rdb := NewRedisClient()
 	defer rdb.Close()
 
 	cache := cache.New(rdb)

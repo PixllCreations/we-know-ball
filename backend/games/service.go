@@ -58,6 +58,42 @@ func (s *Service) GetGame(ctx context.Context, id string) (Game, error) {
 		}
 		return Game{}, err
 	}
+
+	// Cache may hold a thinner or partially mapped game shape from an earlier write.
+	// For game detail route, backfill when boxscore is missing or looks incomplete.
+	if needsDetailBackfill(cached) {
+		log.Println("cache hit without boxscore, fetching full game detail from upstream")
+		fetched, err := s.fetcher.FetchGame(ctx, id)
+		if err != nil {
+			// Serve stale cached game rather than failing the request.
+			log.Printf("failed to backfill game detail from upstream: %v", err)
+			log.Println("returning cached game")
+			return cached, nil
+		}
+		if err := s.cache.SetGame(ctx, fetched); err != nil {
+			log.Printf("failed to set backfilled game in cache: %v", err)
+		}
+		return fetched, nil
+	}
+
 	log.Println("cache hit, returning cached game")
 	return cached, nil
+}
+
+func needsDetailBackfill(g Game) bool {
+	if g.Boxscore == nil {
+		return true
+	}
+	if len(g.Boxscore.Teams) == 0 {
+		return true
+	}
+	if len(g.Boxscore.Players) == 0 {
+		return true
+	}
+	for _, block := range g.Boxscore.Players {
+		if len(block.Rows) > 0 {
+			return false
+		}
+	}
+	return true
 }

@@ -56,31 +56,6 @@ export interface Team {
   record?: string;
 }
 
-export interface Competitor {
-  id: string;
-  homeAway: "home" | "away";
-  score: string;
-  winner?: boolean;
-  team: Team;
-  records?: { summary: string; type: string }[];
-  linescores?: { value: number }[];
-}
-
-export interface GameStatus {
-  clock: number;
-  displayClock: string;
-  period: number;
-  type: {
-    id: string;
-    name: string;
-    state: "pre" | "in" | "post";
-    completed: boolean;
-    description: string;
-    detail: string;
-    shortDetail: string;
-  };
-}
-
 export interface GameParticipant {
   id: string;
   abbreviation: string;
@@ -123,6 +98,64 @@ export interface Game {
   away: GameParticipant;
   leaders?: GameLeader[];
   notes?: { type: string; headline: string }[];
+  boxscore?: Boxscore;
+}
+
+export interface Boxscore {
+  teams?: BoxscoreTeam[];
+  players?: BoxscorePlayers[];
+}
+
+export interface BoxscoreTeam {
+  team: {
+    id: string;
+    abbreviation: string;
+    displayName: string;
+    logo?: string;
+    logos?: { href: string }[];
+  };
+  homeAway?: "home" | "away" | string;
+  stats?: BoxscoreTeamStat[];
+  displayOrder?: number;
+}
+
+export interface BoxscoreTeamStat {
+  name: string;
+  label: string;
+  abbreviation?: string;
+  displayValue: string;
+}
+
+export interface BoxscorePlayers {
+  team: {
+    id: string;
+    abbreviation: string;
+    displayName: string;
+    logo?: string;
+    logos?: { href: string }[];
+  };
+  columns: string[];
+  rows: BoxscorePlayerLine[];
+  totalsRow?: string[];
+  displayOrder?: number;
+}
+
+export interface BoxscorePlayerLine {
+  player: BoxscorePlayer;
+  values: string[];
+  starter?: boolean;
+  didNotPlay?: boolean;
+  reason?: string;
+  ejected?: boolean;
+}
+
+export interface BoxscorePlayer {
+  id: string;
+  displayName: string;
+  shortName?: string;
+  jersey?: string;
+  position?: string;
+  headshot?: string;
 }
 
 export interface StandingsTeam {
@@ -163,43 +196,6 @@ export interface RosterAthlete {
 
 export interface TeamRosterResponse {
   athletes: RosterAthlete[];
-}
-
-export interface BoxscorePlayerAthleteStatLine {
-  athlete: {
-    id: string;
-    displayName: string;
-    shortName: string;
-    jersey?: string;
-    position?: { abbreviation: string };
-    headshot?: { href: string };
-  };
-  stats: string[];
-  starter?: boolean;
-  didNotPlay?: boolean;
-}
-
-export interface GameSummaryResponse {
-  competitions: { competitors: Competitor[]; status: GameStatus }[];
-  boxscore?: {
-    teams: { team: Team; statistics: { name: string; displayValue: string; label: string }[] }[];
-    players?: {
-      team: Team;
-      statistics: {
-        names: string[];
-        athletes: BoxscorePlayerAthleteStatLine[];
-      }[];
-    }[];
-  };
-  gameInfo?: { venue?: { fullName: string; address?: { city: string; state: string } }; attendance?: number };
-  leaders?: {
-    team: Team;
-    leaders: {
-      name: string;
-      displayName: string;
-      leaders: { displayValue: string; athlete: { displayName: string; headshot?: string } }[];
-    }[];
-  }[];
 }
 
 export interface EspnApiStructureSpec {

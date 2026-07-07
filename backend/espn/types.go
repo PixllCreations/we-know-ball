@@ -186,6 +186,120 @@ type LeaderAthlete struct {
 }
 
 // ============================================================================
+// GET /summary?event={id}
+//
+// Game detail payload: header (scores/status), boxscore (team + player stats),
+// gameInfo (venue/attendance), and per-team leaders. Only fields needed for
+// mapping are modeled; plays, odds, injuries, etc. are ignored by the decoder.
+// ============================================================================
+
+// SummaryResponse is the root document returned by GET .../summary?event={id}.
+type SummaryResponse struct {
+	Header   SummaryHeader        `json:"header"`
+	Boxscore *SummaryBoxscore     `json:"boxscore,omitempty"`
+	GameInfo *SummaryGameInfo     `json:"gameInfo,omitempty"`
+	Leaders  []SummaryLeaderTeam  `json:"leaders,omitempty"`
+}
+
+type SummaryHeader struct {
+	ID           string               `json:"id"`
+	GameNote     string               `json:"gameNote,omitempty"`
+	Competitions []SummaryCompetition `json:"competitions"`
+}
+
+type SummaryCompetition struct {
+	competitionCore
+	Competitors []SummaryCompetitor `json:"competitors"`
+}
+
+// SummaryCompetitor mirrors schedule competitors: score is a string and
+// team logos arrive as logos[], not team.logo.
+type SummaryCompetitor struct {
+	ID       string                `json:"id"`
+	HomeAway string                `json:"homeAway"`
+	Winner   bool                  `json:"winner,omitempty"`
+	Team     SummaryCompetitorTeam `json:"team"`
+	Score    string                `json:"score"`
+	Records  []ScoreboardRecord    `json:"records,omitempty"`
+}
+
+type SummaryCompetitorTeam struct {
+	ID               string `json:"id"`
+	Abbreviation     string `json:"abbreviation"`
+	DisplayName      string `json:"displayName"`
+	ShortDisplayName string `json:"shortDisplayName,omitempty"`
+	Name             string `json:"name,omitempty"`
+	Location         string `json:"location,omitempty"`
+	Logo             string `json:"logo,omitempty"`
+	Logos            []Logo `json:"logos,omitempty"`
+}
+
+type SummaryGameInfo struct {
+	Venue      *Venue `json:"venue,omitempty"`
+	Attendance int    `json:"attendance,omitempty"`
+}
+
+type SummaryLeaderTeam struct {
+	Team    Team             `json:"team"`
+	Leaders []LeaderCategory `json:"leaders"`
+}
+
+type SummaryBoxscore struct {
+	Teams   []SummaryBoxscoreTeam    `json:"teams,omitempty"`
+	Players []SummaryBoxscorePlayers `json:"players,omitempty"`
+}
+
+type SummaryBoxscoreTeam struct {
+	Team         Team               `json:"team"`
+	Statistics   []SummaryStatistic `json:"statistics"`
+	DisplayOrder int                `json:"displayOrder,omitempty"`
+	HomeAway     string             `json:"homeAway,omitempty"`
+}
+
+type SummaryStatistic struct {
+	Name         string `json:"name"`
+	DisplayValue string `json:"displayValue"`
+	Label        string `json:"label"`
+	Abbreviation string `json:"abbreviation,omitempty"`
+}
+
+type SummaryBoxscorePlayers struct {
+	Team         Team                      `json:"team"`
+	Statistics   []SummaryPlayerStatistics `json:"statistics"`
+	DisplayOrder int                       `json:"displayOrder,omitempty"`
+}
+
+// SummaryPlayerStatistics holds the player stat table for one team.
+// athletes[].stats values align by index with names[] (parallel arrays).
+type SummaryPlayerStatistics struct {
+	Names        []string                     `json:"names"`
+	Keys         []string                     `json:"keys,omitempty"`
+	Labels       []string                     `json:"labels,omitempty"`
+	Descriptions []string                     `json:"descriptions,omitempty"`
+	Athletes     []SummaryBoxscoreAthleteLine `json:"athletes"`
+	Totals       []string                     `json:"totals,omitempty"`
+}
+
+type SummaryBoxscoreAthleteLine struct {
+	Active     bool                   `json:"active,omitempty"`
+	Starter    bool                   `json:"starter,omitempty"`
+	DidNotPlay bool                   `json:"didNotPlay,omitempty"`
+	Reason     string                 `json:"reason,omitempty"`
+	Ejected    bool                   `json:"ejected,omitempty"`
+	Athlete    SummaryBoxscoreAthlete `json:"athlete"`
+	Stats      []string               `json:"stats"`
+}
+
+type SummaryBoxscoreAthlete struct {
+	ID          string   `json:"id"`
+	DisplayName string   `json:"displayName"`
+	ShortName   string   `json:"shortName"`
+	Jersey      string   `json:"jersey,omitempty"`
+	Position    Position `json:"position,omitempty"`
+	Headshot    *Logo    `json:"headshot,omitempty"`
+}
+
+// ============================================================================
 // GET /scoreboard
 //
 // Shape differences vs the schedule endpoint (same field names, different

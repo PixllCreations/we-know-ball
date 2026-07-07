@@ -36,6 +36,15 @@ func (gc *GameCache) SetGame(
 	ctx context.Context,
 	game Game,
 ) error {
+	// Preserve richer cached game detail when ingesting thinner scoreboard/schedule shapes.
+	if cached, err := gc.GetGame(ctx, game.ID); err == nil {
+		if game.Boxscore == nil && cached.Boxscore != nil {
+			game.Boxscore = cached.Boxscore
+		}
+	} else if err != cache.ErrCacheMiss {
+		return err
+	}
+
 	return gc.cache.Set(
 		ctx,
 		gameKey(game.ID),

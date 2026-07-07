@@ -26,6 +26,8 @@ type Game struct {
 	Away    Participant `json:"away"`
 	Leaders []Leader    `json:"leaders,omitempty"`
 	Notes   []Note      `json:"notes,omitempty"`
+
+	Boxscore *Boxscore `json:"boxscore,omitempty"`
 }
 
 type Venue struct {
@@ -66,6 +68,63 @@ type Leader struct {
 	Value        string `json:"value"`
 	AthleteID    string `json:"athleteId,omitempty"`
 	Athlete      string `json:"athlete"`
+}
+
+type Boxscore struct {
+	Teams   []BoxscoreTeam    `json:"teams,omitempty"`
+	Players []BoxscorePlayers `json:"players,omitempty"`
+}
+
+// BoxscoreTeam holds aggregate, team-level stats (FG, REB, AST, etc.).
+type BoxscoreTeam struct {
+	Team       ParticipantTeam     `json:"team"`
+	HomeAway   string              `json:"homeAway,omitempty"`
+	Stats      []BoxscoreTeamStat   `json:"stats,omitempty"`
+	DisplayOrd int                 `json:"displayOrder,omitempty"`
+}
+
+type BoxscoreTeamStat struct {
+	Name         string `json:"name"`
+	Label        string `json:"label"`
+	Abbreviation string `json:"abbreviation,omitempty"`
+	DisplayValue string `json:"displayValue"`
+}
+
+// BoxscorePlayers holds one team table in the player box score.
+// Values are parallel arrays aligned by index with Columns.
+type BoxscorePlayers struct {
+	Team       ParticipantTeam        `json:"team"`
+	Columns    []string             `json:"columns"`
+	Rows       []BoxscorePlayerLine `json:"rows"`
+	TotalsRow  []string             `json:"totalsRow,omitempty"`
+	DisplayOrd int                  `json:"displayOrder,omitempty"`
+}
+
+type BoxscorePlayerLine struct {
+	Player    BoxscorePlayer `json:"player"`
+	Values    []string       `json:"values"`
+	Starter   bool           `json:"starter,omitempty"`
+	DidNotPlay bool          `json:"didNotPlay,omitempty"`
+	Reason    string         `json:"reason,omitempty"`
+	Ejected   bool           `json:"ejected,omitempty"`
+}
+
+type BoxscorePlayer struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"displayName"`
+	ShortName   string `json:"shortName,omitempty"`
+	Jersey      string `json:"jersey,omitempty"`
+	Position    string `json:"position,omitempty"`
+	Headshot    string `json:"headshot,omitempty"`
+}
+
+// ParticipantTeam is the subset of team fields reused across boxscore + game shell.
+type ParticipantTeam struct {
+	ID           string `json:"id"`
+	Abbreviation string `json:"abbreviation"`
+	DisplayName  string `json:"displayName"`
+	Logo         string `json:"logo,omitempty"`
+	Logos        []Logo `json:"logos,omitempty"`
 }
 
 type Fetcher interface {

@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* We Know Ball — Modern NBA, data-first dark design system.
+   All colors HSL. Tokens only — never hardcode in components. */
+
+@layer base {
+  :root {
+    --background: 222 28% 7%;
+    --foreground: 210 30% 96%;
+
+    --surface: 222 24% 10%;
+    --surface-elevated: 222 22% 13%;
+    --surface-hover: 222 20% 16%;
+
+    --card: 222 24% 10%;
+    --card-foreground: 210 30% 96%;
+
+    --popover: 222 24% 10%;
+    --popover-foreground: 210 30% 96%;
+
+    --primary: 18 92% 55%;
+    --primary-foreground: 222 30% 8%;
+    --primary-glow: 22 100% 62%;
+
+    --secondary: 222 18% 18%;
+    --secondary-foreground: 210 30% 96%;
+
+    --muted: 222 18% 14%;
+    --muted-foreground: 215 16% 65%;
+
+    --accent: 200 95% 55%;
+    --accent-foreground: 222 30% 8%;
+
+    --success: 145 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 42 95% 58%;
+    --warning-foreground: 222 30% 8%;
+
+    --live: 0 85% 60%;
+    --live-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 18% 18%;
+    --input: 222 18% 18%;
+    --ring: 18 92% 55%;
+
+    --radius: 0.75rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(18 92% 55%), hsl(22 100% 62%));
+    --gradient-court: linear-gradient(135deg, hsl(222 28% 9%) 0%, hsl(222 24% 12%) 100%);
+    --gradient-hero: radial-gradient(ellipse at top, hsl(18 92% 55% / 0.18), transparent 60%),
+      linear-gradient(180deg, hsl(222 28% 7%), hsl(222 28% 5%));
+    --gradient-stat: linear-gradient(135deg, hsl(222 24% 13%), hsl(222 22% 10%));
+
+    --shadow-card: 0 1px 0 0 hsl(0 0% 100% / 0.04) inset, 0 8px 24px -12px hsl(222 50% 2% / 0.8);
+    --shadow-glow: 0 0 0 1px hsl(18 92% 55% / 0.3), 0 8px 32px -8px hsl(18 92% 55% / 0.45);
+    --shadow-elevated: 0 12px 40px -12px hsl(222 60% 2% / 0.7);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01', 'tnum';
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .live-dot {
+    @apply inline-block h-2 w-2 rounded-full bg-[hsl(var(--live))];
+    box-shadow: 0 0 0 0 hsl(var(--live) / 0.7);
+    animation: live-pulse 1.6s ease-out infinite;
+  }
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--live) / 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px hsl(var(--live) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--live) / 0);
+  }
+}

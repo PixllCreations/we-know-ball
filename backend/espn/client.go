@@ -119,11 +119,11 @@ func (c *Client) FetchScoreboard(ctx context.Context, date string) ([]games.Game
 }
 
 func (c *Client) FetchGame(ctx context.Context, id string) (games.Game, error) {
-	var data ScoreboardEvent
-	if err := c.get(ctx, SiteV2Base, "/events/summary", url.Values{"event": []string{id}}, &data); err != nil {
+	var data SummaryResponse
+	if err := c.get(ctx, SiteV2Base, "/summary", url.Values{"event": []string{id}}, &data); err != nil {
 		return games.Game{}, err
 	}
-	return mapScoreboardEvent(data), nil
+	return mapSummary(&data), nil
 }
 
 func (c *Client) FetchStandings(ctx context.Context) ([]nba.ConferenceStandings, error) {
