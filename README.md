@@ -1,288 +1,198 @@
-# We Know Ball 🏀
+# We Know Ball
 
-**Because everyone thinks they know ball.**
+Full-stack NBA data platform with a Go API, Redis caching layer, and dual React + Angular frontends.
 
-We Know Ball is a real-time NBA analytics and data platform built with an Odin backend and modern web technologies.
-
-The platform aggregates live NBA data, standings, player statistics, team information, and advanced analytics into a single experience designed for fans who want more than a basic scoreboard.
-
-Rather than replicating ESPN, We Know Ball focuses on delivering faster updates, deeper insights, and tools that help users explore, compare, and analyze the league.
+Live scores, standings, team pages, rosters, schedules, and game box scores — built as a focused alternative to bloated sports media sites.
 
 ---
 
-## Vision
+## Highlights
 
-Most sports websites answer:
-
-> "What happened?"
-
-We Know Ball aims to answer:
-
-> "Why did it happen?"
->
-> "What happens next?"
->
-> "Who actually knows ball?"
-
-The long-term goal is to evolve from a live NBA dashboard into a complete basketball analytics and simulation platform.
+- **API-first backend** — Go service that ingests ESPN public NBA APIs, maps verbose upstream JSON into stable domain models, and exposes 7 REST endpoints under `/api/nba`
+- **Redis caching layer** — Cache-aside pattern with entity-level keys, batch `MGET` retrieval, and merge logic that preserves richer cached game detail when thinner scoreboard payloads arrive
+- **Modular domain architecture** — Backend split into `games`, `teams`, and `nba` packages with separate handlers, services, caches, and ESPN mappers
+- **React dashboard** — Scoreboard with date navigation and 30s polling, standings, team directory/detail, and interactive team/player box scores (TanStack Query, shadcn/ui)
+- **Angular port** — Standalone Angular 21 client with feature parity, validating the API contract across frameworks
 
 ---
 
-## Features
+## What I Built
 
-### Live Games
+### Backend
 
-- Real-time scores
-- Live game tracking
-- Play-by-play updates
-- Game summaries
-- Team statistics
+Designed a Go HTTP API that sits between third-party sports data and the UI. ESPN responses are large, inconsistent, and not suitable for direct client consumption — so the backend owns ingestion, normalization, and caching.
 
-### Teams
+- Fetches from ESPN Site v2 (teams, scoreboard, rosters, schedules, summaries) and Core v2 (standings)
+- Maps upstream wire types into flat, UI-friendly structs via a dedicated `espn/` translation layer
+- Caches results in Redis with a 24-hour TTL and cache-aside reads in each service layer
+- Uses Gin for routing and a typed `Fetcher` interface to keep domain logic decoupled from ESPN
 
-- Team profiles
-- Rosters
-- Standings
-- Schedule tracking
-- Team performance analytics
+### Frontend (React)
 
-### Players
+Built the primary UI as a React + TypeScript SPA with a typed API client (`nba-api.ts`) that keeps response shapes stable for components.
 
-- Player profiles
-- Season statistics
-- Career comparisons
-- Advanced metrics
-- Performance trends
+- Route-level pages for scoreboard, standings, teams, team detail, and game detail
+- TanStack Query for server state, stale-time tuning, and scoreboard auto-refresh
+- Tailwind CSS + shadcn/ui component primitives for a consistent design system
 
-### Analytics
+### Frontend (Angular)
 
-- Team rankings
-- Player comparisons
-- Efficiency metrics
-- Historical trends
-- Custom power rankings
+Reimplemented the same product surface in Angular 21 to exercise the API contract independently of React.
 
-### Hot Takes
-
-Because everyone thinks they know ball.
-
-- MVP predictions
-- Championship predictions
-- Trade grades
-- Award forecasting
-- Power ranking debates
-- Weekly community picks
-- Accuracy tracking for predictions
-
-### Future Features
-
-- Trade machine
-- Salary cap explorer
-- Draft simulator
-- Season simulator
-- Playoff simulator
-- Fantasy basketball tools
+- Standalone components, signals, `rxResource`, and `HttpClient`-based API service
+- Shared design tokens and feature parity with the React app
 
 ---
 
 ## Architecture
 
 ```text
-                    ESPN APIs
-                         │
-                         ▼
-               Odin Data Service
-        (Ingestion, Caching, Analytics)
-                         │
-         ┌───────────────┴───────────────┐
-         │                               │
-         ▼                               ▼
-      REST API                    WebSocket Hub
-         │                               │
-         └───────────────┬───────────────┘
-                         │
-                         ▼
-                  Next.js Frontend
+              ESPN Public APIs
+                      │
+                      ▼
+            Go API (Gin, :8081)
+     Ingestion · Mapping · Redis Cache
+                      │
+         ┌────────────┴────────────┐
+         │                         │
+         ▼                         ▼
+  React Frontend            Angular Frontend
+  (Vite, :8080)             (:4200)
+         │                         │
+         └────────────┬────────────┘
+                      │
+              REST via /api/nba
+```
+
+Both frontends are independent clients over the same API. The Vite dev server proxies `/api` to the Go backend.
+
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+| --- | --- |
+| **Backend** | Go 1.25, Gin, go-redis, ESPN Site/Core v2 APIs |
+| **Frontend (React)** | React 18, TypeScript, Vite, React Router, TanStack Query, Tailwind, shadcn/ui, Vitest |
+| **Frontend (Angular)** | Angular 21, RxJS, `rxResource`, Tailwind |
+| **Infrastructure** | Redis (local), REST |
+
+---
+
+## Features
+
+- **Scoreboard** — Daily games with date navigation; live, upcoming, and final states; auto-refresh
+- **Standings** — Conference standings with records and stats
+- **Teams** — Directory, detail pages, rosters, and schedules
+- **Games** — Matchup detail with team and player box scores
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Go 1.25+
+- Redis on `localhost:6379`
+
+### Run locally
+
+```bash
+# Terminal 1 — Redis
+redis-server
+
+# Terminal 2 — Backend
+cd backend && go run .
+
+# Terminal 3 — React frontend
+cd frontend && npm install && npm run dev
+```
+
+- API: `http://localhost:8081`
+- React app: `http://localhost:8080`
+
+### Optional: Angular frontend
+
+```bash
+cd frontend-angular && npm install && npm start
+```
+
+Open `http://localhost:4200`.
+
+See `frontend/README.md` and `frontend-angular/README.md` for frontend-specific details.
+
+---
+
+## Project Structure
+
+```text
+backend/
+  cache/          # Redis helpers (get/set, sets, MGET)
+  espn/           # ESPN client and response mappers
+  games/          # Scoreboard and game summary domain
+  nba/            # Standings domain
+  teams/          # Team, roster, and schedule domain
+  main.go
+
+frontend/
+  src/lib/        # Typed API client
+  src/pages/      # Route-level views
+  src/components/ # Layout and UI
+
+frontend-angular/
+  src/app/core/   # Models and NbaApiService
+  src/app/pages/  # Route-level components
 ```
 
 ---
 
-## Technology Stack
+## API Reference
 
-### Backend
-
-- Odin
-- Native HTTP server
-- WebSockets
-- In-memory caching
-- Background workers
-
-### Frontend
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- Real-time WebSocket subscriptions
-
-### Data Sources
-
-- ESPN Public APIs
-
----
-
-## Core Principles
-
-### Real-Time First
-
-Clients should receive updates instantly without polling.
-
-### Data Ownership
-
-External data is normalized and cached internally so clients never depend directly on third-party APIs.
-
-### Fast User Experience
-
-The backend acts as a high-performance data layer that serves clients from memory whenever possible.
-
-### Analytics Over News
-
-Focus on statistics, insights, comparisons, and simulations rather than articles and journalism.
-
----
-
-## API Examples
-
-### Games
+All endpoints are under `/api/nba`.
 
 ```http
-GET /api/games/live
-GET /api/games/today
-GET /api/games/:id
-```
+GET /api/nba/scoreboard
+GET /api/nba/scoreboard?dates=20250711
+GET /api/nba/games/:id
 
-### Teams
+GET /api/nba/teams
+GET /api/nba/teams/:id
+GET /api/nba/teams/:id/roster
+GET /api/nba/teams/:id/schedule
 
-```http
-GET /api/teams
-GET /api/teams/:id
-GET /api/teams/:id/roster
-GET /api/teams/:id/stats
-```
-
-### Players
-
-```http
-GET /api/players/:id
-GET /api/players/:id/stats
-```
-
-### Standings
-
-```http
-GET /api/standings
+GET /api/nba/standings
 ```
 
 ---
 
-## WebSocket Events
+## Resume Bullets
 
-### Game Updated
+Copy-paste and adjust tense as needed:
 
-```json
-{
-  "event": "game.updated",
-  "gameId": "401705871"
-}
-```
+- Built a full-stack NBA data platform with a Go REST API, Redis cache-aside layer, and React + Angular frontends serving live scores, standings, and box scores
+- Designed an ESPN ingestion and normalization pipeline that maps heterogeneous upstream JSON into stable domain models exposed via 7 cached API endpoints
+- Implemented Redis entity caching with batch `MGET`, set-based team game indexes, and merge logic to retain richer game detail across cache writes
+- Developed a React dashboard with TanStack Query, typed API client, and shadcn/ui; ported the same feature set to Angular 21 to validate API-first architecture
 
-### Team Updated
+**One-liner for a resume project line:**
 
-```json
-{
-  "event": "team.updated",
-  "teamId": "14"
-}
-```
-
-### Standings Updated
-
-```json
-{
-  "event": "standings.updated"
-}
-```
+> Full-stack NBA tracker — Go/Gin API with Redis caching, ESPN data normalization, and React + Angular clients
 
 ---
 
 ## Roadmap
 
-### Phase 1 — Foundation
-
-- [ ] HTTP server
-- [ ] ESPN integration
-- [ ] JSON parsing
-- [ ] In-memory cache
-- [ ] Core API endpoints
-
-### Phase 2 — Real-Time Infrastructure
-
-- [ ] WebSocket server
-- [ ] Event broadcasting
-- [ ] Live score updates
-- [ ] Subscription system
-
-### Phase 3 — NBA Dashboard
-
-- [ ] Live games page
-- [ ] Standings page
-- [ ] Team pages
-- [ ] Player pages
-
-### Phase 4 — Analytics
-
-- [ ] Team comparisons
-- [ ] Advanced statistics
-- [ ] Power rankings
-- [ ] Historical trends
-
-### Phase 5 — Simulations
-
-- [ ] Season simulator
-- [ ] Playoff simulator
-- [ ] Lottery simulator
-- [ ] Trade machine
-
-### Phase 6 — We Really Know Ball
-
-- [ ] Prediction engine
-- [ ] Award forecasting
-- [ ] Team-building tools
-- [ ] Franchise management features
-- [ ] Did We Know Ball? prediction scoring
-
----
-
-## Why Odin?
-
-We Know Ball uses Odin as a high-performance data platform rather than a traditional web framework.
-
-The backend is responsible for:
-
-- Data ingestion
-- Data normalization
-- Caching
-- Event streaming
-- Analytics
-- Simulations
-
-This allows the project to explore Odin's strengths in systems programming, performance, and data-oriented design while using modern web technologies for the user experience.
+- [ ] WebSocket push updates for live scores
+- [ ] Player profile pages
+- [ ] Advanced analytics, comparisons, and power rankings
+- [ ] Community predictions and simulation tools
 
 ---
 
 ## Disclaimer
 
-We Know Ball is an independent project and is not affiliated with, endorsed by, or associated with the NBA, ESPN, or any NBA team.
+Independent project. Not affiliated with, endorsed by, or associated with the NBA, ESPN, or any NBA team.
 
 ---
 
