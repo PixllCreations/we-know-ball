@@ -1,11 +1,14 @@
 package main
 
 import (
+	"os"
+
 	"github.com/PixllCreations/we-know-ball/backend/cache"
 	"github.com/PixllCreations/we-know-ball/backend/espn"
 	"github.com/PixllCreations/we-know-ball/backend/games"
 	"github.com/PixllCreations/we-know-ball/backend/nba"
 	"github.com/PixllCreations/we-know-ball/backend/teams"
+	"github.com/PixllCreations/we-know-ball/backend/web"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,6 +38,12 @@ func main() {
 	gh.SetupRoutes(api)
 	nh.SetupRoutes(api)
 
-	r.Run(":8081")
+	web.Register(r)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
+	r.Run(":" + port)
 
 }
