@@ -1,0 +1,8 @@
+version: 1
+
+app:
+  port: 8080
+
+dependencies:
+  redis:
+    type: redis
