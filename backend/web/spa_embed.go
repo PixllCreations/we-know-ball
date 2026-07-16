@@ -4,8 +4,11 @@ package web
 
 import (
 	"embed"
+	"io"
 	"io/fs"
+	"mime"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -20,29 +23,47 @@ func Register(r *gin.Engine) {
 		panic(err)
 	}
 
-	staticHTTP := http.FS(static)
-
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.Status(http.StatusNotFound)
 			return
 		}
 
-		path := strings.TrimPrefix(c.Request.URL.Path, "/")
-		if path == "" || strings.HasSuffix(path, "/") {
-			path = "index.html"
+		name := strings.TrimPrefix(c.Request.URL.Path, "/")
+		if name == "" || strings.HasSuffix(name, "/") {
+			name = "index.html"
 		}
 
-		if f, err := static.Open(path); err == nil {
-			defer f.Close()
-			if info, err := f.Stat(); err == nil && !info.IsDir() {
-				c.FileFromFS(path, staticHTTP)
-				return
-			}
+		if serveStaticFile(c, static, name) {
+			return
 		}
 
-		// SPA fallback — serve index.html without using http.FileServer,
-		// which issues trailing-slash redirects that loop behind TLS-terminating proxies.
-		c.FileFromFS("index.html", staticHTTP)
+		// SPA client-route fallback.
+		_ = serveStaticFile(c, static, "index.html")
 	})
+}
+
+// serveStaticFile writes an embedded file directly.
+// Do not use gin's FileFromFS / http.FileServer — they issue relative
+// Location: ./ redirects that loop behind Cloudflare/TLS proxies.
+func serveStaticFile(c *gin.Context, static fs.FS, name string) bool {
+	f, err := static.Open(name)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		return false
+	}
+
+	ctype := mime.TypeByExtension(path.Ext(name))
+	if ctype == "" {
+		ctype = "application/octet-stream"
+	}
+	c.Header("Content-Type", ctype)
+	c.Status(http.StatusOK)
+	_, _ = io.Copy(c.Writer, f)
+	return true
 }
