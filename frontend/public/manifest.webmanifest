@@ -1,0 +1,9 @@
+{
+  "id": "/",
+  "name": "We Know Ball",
+  "short_name": "We Know Ball",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827"
+}

@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
+	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/PixllCreations/we-know-ball/backend/cache"
 	"github.com/PixllCreations/we-know-ball/backend/espn"
 	"github.com/PixllCreations/we-know-ball/backend/games"
 	"github.com/PixllCreations/we-know-ball/backend/nba"
+	"github.com/PixllCreations/we-know-ball/backend/push"
 	"github.com/PixllCreations/we-know-ball/backend/teams"
 	"github.com/PixllCreations/we-know-ball/backend/web"
 	"github.com/gin-gonic/gin"
@@ -37,6 +42,18 @@ func main() {
 	th.SetupRoutes(api)
 	gh.SetupRoutes(api)
 	nh.SetupRoutes(api)
+	if os.Getenv("PUSH_ENABLED") == "1" {
+		ps, err := push.New(rdb, espnClient, push.Config{
+			PublicKey: os.Getenv("VAPID_PUBLIC_KEY"), PrivateKey: os.Getenv("VAPID_PRIVATE_KEY"), Subject: os.Getenv("VAPID_SUBJECT"),
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		ps.Routes(api)
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		go ps.Run(ctx)
+	}
 
 	web.Register(r)
 

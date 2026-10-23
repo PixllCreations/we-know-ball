@@ -20,6 +20,7 @@ func mapGameVenue(v *Venue) *games.Venue {
 func applyCompetitionStatus(g *games.Game, s Status) {
 	g.State = s.Type.State
 	g.Status = s.Type.Description
+	g.StatusCode = s.Type.Name
 	g.ShortDetail = s.Type.ShortDetail
 	g.Detail = s.Type.Detail
 	g.Completed = s.Type.Completed

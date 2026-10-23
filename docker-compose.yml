@@ -1,6 +1,9 @@
 services:
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
     ports:
       - "6379:6379"
 
@@ -11,5 +14,12 @@ services:
     environment:
       REDIS_ADDR: redis:6379
       PORT: "8080"
+      PUSH_ENABLED: ${PUSH_ENABLED:-0}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     depends_on:
       - redis
+
+volumes:
+  redis-data:

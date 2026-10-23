@@ -155,6 +155,7 @@ type Status struct {
 }
 
 type StatusType struct {
+	Name        string `json:"name"`
 	State       string `json:"state"`
 	Completed   bool   `json:"completed"`
 	Description string `json:"description"`
@@ -195,10 +196,10 @@ type LeaderAthlete struct {
 
 // SummaryResponse is the root document returned by GET .../summary?event={id}.
 type SummaryResponse struct {
-	Header   SummaryHeader        `json:"header"`
-	Boxscore *SummaryBoxscore     `json:"boxscore,omitempty"`
-	GameInfo *SummaryGameInfo     `json:"gameInfo,omitempty"`
-	Leaders  []SummaryLeaderTeam  `json:"leaders,omitempty"`
+	Header   SummaryHeader       `json:"header"`
+	Boxscore *SummaryBoxscore    `json:"boxscore,omitempty"`
+	GameInfo *SummaryGameInfo    `json:"gameInfo,omitempty"`
+	Leaders  []SummaryLeaderTeam `json:"leaders,omitempty"`
 }
 
 type SummaryHeader struct {
@@ -425,8 +426,8 @@ type StandingsTable struct {
 }
 
 type StandingsEntry struct {
-	Stats []StandingsStat     `json:"stats"`
-	Team  StandingsTeamWire   `json:"team"`
+	Stats []StandingsStat   `json:"stats"`
+	Team  StandingsTeamWire `json:"team"`
 }
 
 type StandingsStat struct {

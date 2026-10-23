@@ -199,3 +199,55 @@ Independent project. Not affiliated with, endorsed by, or associated with the NB
 ## License
 
 MIT
+
+## Game push notifications
+
+The deployed React client offers **Game alerts** on each unfinished game's detail
+page. Opt in on each device for tipoff, halftime, and final score; disable alerts
+from the same page. No account is required. Angular does not yet expose these controls.
+
+Enable the server after generating a stable VAPID key pair:
+
+```sh
+cd backend
+go run ./cmd/vapid-keys
+```
+
+Set these environment variables on the backend (or in the root Compose `.env`):
+
+```dotenv
+PUSH_ENABLED=1
+VAPID_PUBLIC_KEY=<generated public key>
+VAPID_PRIVATE_KEY=<generated private key>
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+Keep the private key secret and retain both keys across deployments. Push is off
+by default. Restart/redeploy after configuring. Serve the frontend over HTTPS
+(localhost works for development), with `/sw.js` served from the frontend origin.
+On iOS/iPadOS 16.4+, add the site to the Home Screen and open that app before
+opting in. Browser/OS notification settings still control delivery. The service
+worker handles notifications only; it does not cache pages or API responses.
+
+The Go worker fetches watched game summaries directly from ESPN every 30 seconds,
+independent of page traffic. It seeds each subscription from the current game
+state, avoiding old alerts when opting in. Halftime uses ESPN's explicit halftime
+status, not just a zero clock. No synthetic catch-up halftime or tipoff alerts are
+sent if polling skips that phase. Final alerts require `completed: true`.
+Unfinished game cache entries also now expire after 20 seconds to keep API reads
+fresh, while final games retain the 24-hour cache.
+
+Subscriptions and delivery progress live in Redis for up to seven days, with
+completed and invalid (404/410) subscriptions removed. Compose enables AOF and a
+named volume so progress survives container restarts. Other deployments must
+provide persistent Redis, without eviction of `push:*` keys. Losing Redis data
+loses subscriptions; clearing browser storage loses that device's management
+key. The browser subscription alone does not restore saved game selections.
+
+Failed deliveries retry while the event remains current. Notifications expire at
+the push provider after five minutes. Redis leases and saved phase markers prevent
+routine duplicate sends across instances; a crash between provider acceptance
+and saving progress can still produce a duplicate (the notification tag collapses
+matching alerts). Delivery is best effort, depends on ESPN freshness and device
+availability, and is not a precise tipoff timer. Supported provider endpoints are
+Chrome/FCM, Firefox, and Apple Web Push.

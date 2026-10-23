@@ -45,11 +45,15 @@ func (gc *GameCache) SetGame(
 		return err
 	}
 
+	ttl := gc.ttl
+	if !game.Completed {
+		ttl = 20 * time.Second
+	}
 	return gc.cache.Set(
 		ctx,
 		gameKey(game.ID),
 		game,
-		gc.ttl,
+		ttl,
 	)
 }
 

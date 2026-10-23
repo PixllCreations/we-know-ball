@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Skeleton from "@/components/Skeleton";
+import GameAlerts from "@/components/GameAlerts";
 import { BoxscorePlayerLine, BoxscorePlayers, Game, GameParticipant, formatGameDate, getGame } from "@/lib/nba-api";
 import { cn } from "@/lib/utils";
 
@@ -153,6 +154,8 @@ const GameDetail = ({ game }: { game: Game }) => {
           </div>
         )}
       </section>
+
+      <GameAlerts key={game.id} game={game} />
 
       {game.leaders && game.leaders.length > 0 && (
         <section>
