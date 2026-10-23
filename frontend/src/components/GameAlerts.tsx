@@ -15,6 +15,12 @@ function applicationKey(key: string) {
   const bytes = atob(key.replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(bytes, (char) => char.charCodeAt(0));
 }
+function sameApplicationKey(subscription: PushSubscription, expected: Uint8Array) {
+  const current = subscription.options.applicationServerKey;
+  if (!current) return false;
+  const bytes = new Uint8Array(current);
+  return bytes.length === expected.length && bytes.every((value, index) => value === expected[index]);
+}
 async function request(id: string, method = "GET", subscription?: PushSubscription, suffix = "") {
   const response = await fetch(`${base}/push/games/${encodeURIComponent(id)}${suffix}`, {
     method,
@@ -64,8 +70,14 @@ export default function GameAlerts({ game }: { game: Game }) {
         }
         await navigator.serviceWorker.register("/sw.js");
         const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({
-          userVisibleOnly: true, applicationServerKey: applicationKey(publicKey),
+        const expectedKey = applicationKey(publicKey);
+        let subscription = await registration.pushManager.getSubscription();
+        if (subscription && !sameApplicationKey(subscription, expectedKey)) {
+          await subscription.unsubscribe();
+          subscription = null;
+        }
+        subscription ??= await registration.pushManager.subscribe({
+          userVisibleOnly: true, applicationServerKey: expectedKey,
         });
         await request(game.id, "PUT", subscription);
         setEnabled(true);

@@ -230,6 +230,10 @@ by default. Restart/redeploy after configuring. Serve the frontend over HTTPS
 On iOS/iPadOS 16.4+, add the site to the Home Screen and open that app before
 opting in. Browser/OS notification settings still control delivery. The service
 worker handles notifications only; it does not cache pages or API responses.
+If the VAPID key pair is rotated, the client detects subscriptions created with
+the previous public key and replaces them the next time that device enables a
+game alert. Existing per-game selections cannot migrate automatically and must
+be enabled again.
 
 The Go worker fetches watched game summaries directly from ESPN every 30 seconds,
 independent of page traffic. It seeds each subscription from the current game

@@ -244,9 +244,9 @@ func (s *Service) Routes(api *gin.RouterGroup) {
 			c.Status(502)
 			return
 		}
-		if status == 404 || status == 410 {
+		if status == 401 || status == 403 || status == 404 || status == 410 {
 			_ = s.rdb.Del(c.Request.Context(), c.GetString("watchKey")).Err()
-			log.Printf("push: test subscription expired game=%s provider=%s status=%d", w.GameID, provider, status)
+			log.Printf("push: test subscription invalid game=%s provider=%s status=%d", w.GameID, provider, status)
 			c.Status(410)
 			return
 		}
@@ -349,8 +349,8 @@ func (s *Service) process(ctx context.Context, key string, snapshots map[string]
 			log.Printf("push: delivery failed game=%s event=%q provider=%s error=%s; will retry", g.ID, title, provider, safeDeliveryError(err, w.Subscription))
 			return
 		}
-		if status == 404 || status == 410 {
-			log.Printf("push: subscription expired game=%s event=%q provider=%s status=%d", g.ID, title, provider, status)
+		if status == 401 || status == 403 || status == 404 || status == 410 {
+			log.Printf("push: subscription invalid game=%s event=%q provider=%s status=%d", g.ID, title, provider, status)
 			remove = true
 		} else if status < 200 || status >= 300 {
 			log.Printf("push: delivery rejected game=%s event=%q provider=%s status=%d; will retry", g.ID, title, provider, status)

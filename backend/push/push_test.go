@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -112,17 +113,21 @@ func TestDeliveryErrorsRedactPushEndpoint(t *testing.T) {
 	}
 }
 
-func TestGoneSubscriptionIsRemoved(t *testing.T) {
-	mr := miniredis.RunT(t)
-	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	defer rdb.Close()
-	ctx := context.Background()
-	raw, _ := json.Marshal(watch{GameID: "1", Phase: 0})
-	rdb.Set(ctx, "push:watch:1:device", raw, watchTTL)
-	s := &Service{rdb: rdb, fetcher: &fakeFetcher{game: games.Game{ID: "1", State: "in", Period: 1}}}
-	s.send = func(context.Context, []byte, *webpush.Subscription) (int, error) { return 410, nil }
-	s.poll(ctx)
-	if rdb.Exists(ctx, "push:watch:1:device").Val() != 0 {
-		t.Fatal("expired subscription not removed")
+func TestInvalidSubscriptionsAreRemoved(t *testing.T) {
+	for _, status := range []int{401, 403, 404, 410} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			mr := miniredis.RunT(t)
+			rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+			defer rdb.Close()
+			ctx := context.Background()
+			raw, _ := json.Marshal(watch{GameID: "1", Phase: 0})
+			rdb.Set(ctx, "push:watch:1:device", raw, watchTTL)
+			s := &Service{rdb: rdb, fetcher: &fakeFetcher{game: games.Game{ID: "1", State: "in", Period: 1}}}
+			s.send = func(context.Context, []byte, *webpush.Subscription) (int, error) { return status, nil }
+			s.poll(ctx)
+			if rdb.Exists(ctx, "push:watch:1:device").Val() != 0 {
+				t.Fatal("invalid subscription not removed")
+			}
+		})
 	}
 }
