@@ -33,7 +33,11 @@ func TestRoutesSeedCurrentStateAndDisable(t *testing.T) {
 	}}
 	data, _ := json.Marshal(sub)
 	call := func(method, token string, body []byte) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(method, "/api/nba/push/games/123", bytes.NewReader(body))
+		path := "/api/nba/push/games/123"
+		if method == "POST" {
+			path += "/test"
+		}
+		req := httptest.NewRequest(method, path, bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		out := httptest.NewRecorder()
@@ -49,6 +53,12 @@ func TestRoutesSeedCurrentStateAndDisable(t *testing.T) {
 	s.poll(context.Background())
 	if calls != 0 {
 		t.Fatal("sent historical tipoff on opt-in")
+	}
+	if got := call("POST", token, nil).Code; got != 204 {
+		t.Fatalf("test delivery: %d", got)
+	}
+	if calls != 1 {
+		t.Fatalf("expected one test delivery, got %d", calls)
 	}
 	if got := call("GET", token, nil); got.Code != 200 || !strings.Contains(got.Body.String(), "true") {
 		t.Fatalf("get: %s", got.Body.String())

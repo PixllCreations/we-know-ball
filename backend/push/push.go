@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -128,6 +129,25 @@ func validSubscription(sub webpush.Subscription) bool {
 	return err == nil
 }
 
+func providerHost(sub webpush.Subscription) string {
+	u, err := url.Parse(sub.Endpoint)
+	if err != nil {
+		return "unknown"
+	}
+	return u.Hostname()
+}
+
+func safeDeliveryError(err error, sub webpush.Subscription) string {
+	if err == nil {
+		return ""
+	}
+	// Push endpoints are bearer-like capability URLs. Never write one to logs.
+	if sub.Endpoint == "" {
+		return err.Error()
+	}
+	return strings.ReplaceAll(err.Error(), sub.Endpoint, "[push endpoint]")
+}
+
 func (s *Service) Routes(api *gin.RouterGroup) {
 	api.GET("/push/config", func(c *gin.Context) { c.JSON(200, gin.H{"publicKey": s.config.PublicKey}) })
 	group := api.Group("/push/games/:id", func(c *gin.Context) {
@@ -192,6 +212,50 @@ func (s *Service) Routes(api *gin.RouterGroup) {
 			c.Status(503)
 			return
 		}
+		c.Status(204)
+	})
+	group.POST("/test", func(c *gin.Context) {
+		raw, err := s.rdb.Get(c.Request.Context(), c.GetString("watchKey")).Result()
+		if errors.Is(err, redis.Nil) {
+			c.Status(404)
+			return
+		}
+		if err != nil {
+			c.Status(503)
+			return
+		}
+		var w watch
+		if json.Unmarshal([]byte(raw), &w) != nil || !validSubscription(w.Subscription) {
+			c.Status(500)
+			return
+		}
+		payload, _ := json.Marshal(map[string]string{
+			"title": "We Know Ball test alert",
+			"body":  "Game alerts are working on this device.",
+			"url":   "/games/" + w.GameID,
+			"tag":   "game-" + w.GameID + "-test",
+		})
+		sendCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		status, sendErr := s.send(sendCtx, payload, &w.Subscription)
+		cancel()
+		provider := providerHost(w.Subscription)
+		if sendErr != nil {
+			log.Printf("push: test delivery failed game=%s provider=%s error=%s", w.GameID, provider, safeDeliveryError(sendErr, w.Subscription))
+			c.Status(502)
+			return
+		}
+		if status == 404 || status == 410 {
+			_ = s.rdb.Del(c.Request.Context(), c.GetString("watchKey")).Err()
+			log.Printf("push: test subscription expired game=%s provider=%s status=%d", w.GameID, provider, status)
+			c.Status(410)
+			return
+		}
+		if status < 200 || status >= 300 {
+			log.Printf("push: test delivery rejected game=%s provider=%s status=%d", w.GameID, provider, status)
+			c.Status(502)
+			return
+		}
+		log.Printf("push: test delivery accepted game=%s provider=%s status=%d", w.GameID, provider, status)
 		c.Status(204)
 	})
 }
@@ -280,15 +344,19 @@ func (s *Service) process(ctx context.Context, key string, snapshots map[string]
 		sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		status, err := s.send(sendCtx, payload, &w.Subscription)
 		cancel()
+		provider := providerHost(w.Subscription)
 		if err != nil {
-			log.Print("push: delivery failed; will retry")
+			log.Printf("push: delivery failed game=%s event=%q provider=%s error=%s; will retry", g.ID, title, provider, safeDeliveryError(err, w.Subscription))
 			return
 		}
 		if status == 404 || status == 410 {
+			log.Printf("push: subscription expired game=%s event=%q provider=%s status=%d", g.ID, title, provider, status)
 			remove = true
 		} else if status < 200 || status >= 300 {
-			log.Printf("push: delivery status %d; will retry", status)
+			log.Printf("push: delivery rejected game=%s event=%q provider=%s status=%d; will retry", g.ID, title, provider, status)
 			return
+		} else {
+			log.Printf("push: delivery accepted game=%s event=%q provider=%s status=%d", g.ID, title, provider, status)
 		}
 	}
 	w.Phase = p

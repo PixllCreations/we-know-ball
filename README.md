@@ -204,7 +204,9 @@ MIT
 
 The deployed React client offers **Game alerts** on each unfinished game's detail
 page. Opt in on each device for tipoff, halftime, and final score; disable alerts
-from the same page. No account is required. Angular does not yet expose these controls.
+from the same page. After enabling alerts, use **Send test alert** to verify the
+browser subscription and provider delivery immediately. No account is required.
+Angular does not yet expose these controls.
 
 Enable the server after generating a stable VAPID key pair:
 
@@ -251,3 +253,9 @@ and saving progress can still produce a duplicate (the notification tag collapse
 matching alerts). Delivery is best effort, depends on ESPN freshness and device
 availability, and is not a precise tipoff timer. Supported provider endpoints are
 Chrome/FCM, Firefox, and Apple Web Push.
+
+The backend logs each attempted event or test delivery with the game ID, event,
+provider hostname, and provider status. Push endpoint capability URLs are redacted.
+A provider `2xx` status confirms acceptance by Apple, Google, or Mozilla; final
+display still depends on the device's notification settings, Focus mode, and
+network availability.

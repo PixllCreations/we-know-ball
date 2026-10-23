@@ -32,6 +32,9 @@ it("requests permission on click, saves the subscription, and disables alerts", 
   expect(permission).toHaveBeenCalledOnce();
   expect(subscribe).toHaveBeenCalledOnce();
   expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/push/games/123"), expect.objectContaining({ method: "PUT" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send test alert" }));
+  await screen.findByText(/Test alert accepted/);
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/push/games/123/test"), expect.objectContaining({ method: "POST" }));
   fireEvent.click(screen.getByRole("button", { name: "Disable alerts" }));
   await screen.findByRole("button", { name: "Enable alerts" });
   expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ method: "DELETE" }));

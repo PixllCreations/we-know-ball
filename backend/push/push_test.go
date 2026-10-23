@@ -104,6 +104,14 @@ func TestSubscriptionRejectsArbitraryEndpoints(t *testing.T) {
 	}
 }
 
+func TestDeliveryErrorsRedactPushEndpoint(t *testing.T) {
+	sub := webpush.Subscription{Endpoint: "https://web.push.apple.com/secret-capability"}
+	got := safeDeliveryError(errors.New("POST https://web.push.apple.com/secret-capability failed"), sub)
+	if got != "POST [push endpoint] failed" {
+		t.Fatalf("endpoint was not redacted: %q", got)
+	}
+}
+
 func TestGoneSubscriptionIsRemoved(t *testing.T) {
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
