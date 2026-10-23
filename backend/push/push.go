@@ -42,6 +42,10 @@ type watch struct {
 	Phase        int                  `json:"phase"`
 }
 
+func librarySubscriber(subject string) string {
+	return strings.TrimPrefix(subject, "mailto:")
+}
+
 func New(rdb *redis.Client, fetcher games.Fetcher, cfg Config) (*Service, error) {
 	pub, e1 := base64.RawURLEncoding.DecodeString(cfg.PublicKey)
 	priv, e2 := base64.RawURLEncoding.DecodeString(cfg.PrivateKey)
@@ -53,10 +57,14 @@ func New(rdb *redis.Client, fetcher games.Fetcher, cfg Config) (*Service, error)
 		return nil, fmt.Errorf("push keys do not match")
 	}
 	s := &Service{rdb: rdb, fetcher: fetcher, config: cfg}
+	// webpush-go v1.4 adds mailto: to every subscriber that is not an HTTPS
+	// URL. Strip our configuration's standards-compliant prefix so it does not
+	// produce an invalid mailto:mailto:... JWT subject.
+	subscriber := librarySubscriber(cfg.Subject)
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	s.send = func(ctx context.Context, data []byte, sub *webpush.Subscription) (int, error) {
 		resp, err := webpush.SendNotificationWithContext(ctx, data, sub, &webpush.Options{
-			Subscriber: cfg.Subject, VAPIDPublicKey: cfg.PublicKey, VAPIDPrivateKey: cfg.PrivateKey,
+			Subscriber: subscriber, VAPIDPublicKey: cfg.PublicKey, VAPIDPrivateKey: cfg.PrivateKey,
 			TTL: 300, HTTPClient: client,
 		})
 		if err != nil {

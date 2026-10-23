@@ -224,6 +224,9 @@ VAPID_PRIVATE_KEY=<generated private key>
 VAPID_SUBJECT=mailto:you@example.com
 ```
 
+Use the standard `mailto:` form shown above. The server normalizes it for the
+Web Push library before creating the VAPID JWT.
+
 Keep the private key secret and retain both keys across deployments. Push is off
 by default. Restart/redeploy after configuring. Serve the frontend over HTTPS
 (localhost works for development), with `/sw.js` served from the frontend origin.

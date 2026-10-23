@@ -41,6 +41,15 @@ func TestEvents(t *testing.T) {
 		})
 	}
 }
+
+func TestLibrarySubscriberAvoidsDoubleMailtoPrefix(t *testing.T) {
+	if got := librarySubscriber("mailto:user@example.com"); got != "user@example.com" {
+		t.Fatalf("got %q", got)
+	}
+	if got := librarySubscriber("https://example.com"); got != "https://example.com" {
+		t.Fatalf("got %q", got)
+	}
+}
 func TestDeliveryRetryDedupAndCleanup(t *testing.T) {
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
