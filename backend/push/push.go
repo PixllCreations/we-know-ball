@@ -24,7 +24,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const watchTTL = 7 * 24 * time.Hour
+const (
+	watchTTL     = 7 * 24 * time.Hour
+	watchVersion = 2
+)
 
 var digits = regexp.MustCompile(`^[0-9]{1,20}$`)
 var tokenPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -39,7 +42,9 @@ type Service struct {
 type watch struct {
 	GameID       string               `json:"gameId"`
 	Subscription webpush.Subscription `json:"subscription"`
+	Version      int                  `json:"version,omitempty"`
 	Phase        int                  `json:"phase"`
+	Period       int                  `json:"period,omitempty"`
 }
 
 func librarySubscriber(subject string) string {
@@ -97,20 +102,32 @@ func phase(g games.Game) int {
 	}
 	return 1
 }
-func event(previous int, g games.Game) string {
+func event(w watch, g games.Game) string {
 	p := phase(g)
-	if previous < 0 || p <= previous {
+	if p < 0 {
 		return ""
 	}
-	switch p {
-	case 1:
-		if previous == 0 {
-			return "Tipoff"
-		}
-	case 2:
-		return "Halftime"
-	case 4:
+	if p == 4 && w.Phase < 4 {
 		return "Final score"
+	}
+	if g.State != "in" {
+		return ""
+	}
+	if p == 2 && w.Phase < 2 {
+		return "Halftime"
+	}
+	if g.Period == 1 && w.Phase == 0 {
+		return "Tipoff"
+	}
+	if g.Period > w.Period {
+		switch g.Period {
+		case 2:
+			return "Second quarter"
+		case 3:
+			return "Third quarter"
+		case 4:
+			return "Fourth quarter"
+		}
 	}
 	return ""
 }
@@ -208,7 +225,7 @@ func (s *Service) Routes(api *gin.RouterGroup) {
 			c.JSON(409, gin.H{"error": "This game is not available for alerts."})
 			return
 		}
-		data, _ := json.Marshal(watch{GameID: g.ID, Subscription: sub, Phase: phase(g)})
+		data, _ := json.Marshal(watch{GameID: g.ID, Subscription: sub, Version: watchVersion, Phase: phase(g), Period: g.Period})
 		if s.rdb.Set(c.Request.Context(), c.GetString("watchKey"), data, watchTTL).Err() != nil {
 			c.Status(503)
 			return
@@ -338,16 +355,34 @@ func (s *Service) process(ctx context.Context, key string, snapshots map[string]
 		snapshots[w.GameID] = g
 	}
 	p := phase(g)
-	if p < 0 || p <= w.Phase {
+	if p < 0 {
 		return
 	}
-	title := event(w.Phase, g)
+	// Watches from the previous schema did not record the last observed period.
+	// Seed them from the current live snapshot without inventing a quarter alert.
+	// A pending final remains safe to deliver because the legacy phase records it.
+	if w.Version < watchVersion && !g.Completed {
+		w.Version = watchVersion
+		w.Phase = p
+		w.Period = g.Period
+		data, _ := json.Marshal(w)
+		if _, err := updateWatch.Run(ctx, s.rdb, []string{key}, raw, string(data)).Result(); err != nil {
+			log.Print("push: could not migrate delivery state")
+		}
+		return
+	}
+	advanced := p > w.Phase || g.Period > w.Period
+	if !advanced {
+		return
+	}
+	title := event(w, g)
 	remove := false
 	if title != "" {
 		payload, _ := json.Marshal(map[string]string{
 			"title": title + " · " + g.ShortName,
 			"body":  fmt.Sprintf("%s %s — %s %s", g.Away.DisplayName, g.Away.Score, g.Home.DisplayName, g.Home.Score),
-			"url":   "/games/" + g.ID, "tag": "game-" + g.ID + "-" + fmt.Sprint(p),
+			"url":   "/games/" + g.ID,
+			"tag":   fmt.Sprintf("game-%s-%d-%d", g.ID, p, g.Period),
 		})
 		sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		status, err := s.send(sendCtx, payload, &w.Subscription)
@@ -367,7 +402,9 @@ func (s *Service) process(ctx context.Context, key string, snapshots map[string]
 			log.Printf("push: delivery accepted game=%s event=%q provider=%s status=%d", g.ID, title, provider, status)
 		}
 	}
+	w.Version = watchVersion
 	w.Phase = p
+	w.Period = g.Period
 	data, _ := json.Marshal(w)
 	if remove || g.Completed {
 		data = nil

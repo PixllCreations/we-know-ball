@@ -203,7 +203,8 @@ MIT
 ## Game push notifications
 
 The deployed React client offers **Game alerts** on each unfinished game's detail
-page. Opt in on each device for tipoff, halftime, and final score; disable alerts
+page. Opt in on each device for tipoff, every quarter start, halftime, and the
+final score; disable alerts
 from the same page. After enabling alerts, use **Send test alert** to verify the
 browser subscription and provider delivery immediately. No account is required.
 Angular does not yet expose these controls.
@@ -241,8 +242,10 @@ be enabled again.
 The Go worker fetches watched game summaries directly from ESPN every 30 seconds,
 independent of page traffic. It seeds each subscription from the current game
 state, avoiding old alerts when opting in. Halftime uses ESPN's explicit halftime
-status, not just a zero clock. No synthetic catch-up halftime or tipoff alerts are
-sent if polling skips that phase. Final alerts require `completed: true`.
+status, not just a zero clock. Tipoff serves as the first-quarter alert; the
+second, third, and fourth quarters each receive their own alert. If polling skips
+an intermediate quarter state, only the current quarter is announced rather than
+sending stale catch-up alerts. Final alerts require `completed: true`.
 Unfinished game cache entries also now expire after 20 seconds to keep API reads
 fresh, while final games retain the 24-hour cache.
 

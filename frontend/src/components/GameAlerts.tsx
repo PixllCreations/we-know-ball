@@ -105,7 +105,7 @@ export default function GameAlerts({ game }: { game: Game }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display font-semibold">Game alerts</h2>
-          <p className="text-sm text-muted-foreground">Tipoff, halftime and final score for this game. Alerts expire after seven days.</p>
+          <p className="text-sm text-muted-foreground">Tipoff, each quarter, halftime and final score for this game. Alerts expire after seven days.</p>
         </div>
         {ready && <div className="flex items-center gap-2">
           {enabled && <button type="button" disabled={busy} onClick={testAlert}

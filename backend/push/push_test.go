@@ -20,22 +20,25 @@ func (f *fakeFetcher) FetchGame(context.Context, string) (games.Game, error)    
 func (f *fakeFetcher) FetchScoreboard(context.Context, string) ([]games.Game, error) { return nil, nil }
 func TestEvents(t *testing.T) {
 	cases := []struct {
-		name   string
-		before int
-		game   games.Game
-		want   string
+		name  string
+		watch watch
+		game  games.Game
+		want  string
 	}{
-		{"tipoff", 0, games.Game{State: "in", Period: 1}, "Tipoff"},
-		{"halftime", 1, games.Game{State: "in", StatusCode: "STATUS_HALFTIME", Period: 2}, "Halftime"},
-		{"stopped clock is not halftime", 1, games.Game{State: "in", Period: 2, Clock: 0}, ""},
-		{"second half skips late tipoff", 0, games.Game{State: "in", Period: 3}, ""},
-		{"final", 3, games.Game{State: "post", Completed: true}, "Final score"},
-		{"cancelled", 1, games.Game{State: "post", StatusCode: "STATUS_CANCELED"}, ""},
-		{"same snapshot", 2, games.Game{State: "in", StatusCode: "STATUS_HALFTIME"}, ""},
+		{"tipoff is first quarter", watch{Phase: 0, Period: 0}, games.Game{State: "in", Period: 1}, "Tipoff"},
+		{"second quarter", watch{Phase: 1, Period: 1}, games.Game{State: "in", Period: 2}, "Second quarter"},
+		{"halftime", watch{Phase: 1, Period: 2}, games.Game{State: "in", StatusCode: "STATUS_HALFTIME", Period: 2}, "Halftime"},
+		{"third quarter", watch{Phase: 2, Period: 2}, games.Game{State: "in", Period: 3}, "Third quarter"},
+		{"fourth quarter", watch{Phase: 3, Period: 3}, games.Game{State: "in", Period: 4}, "Fourth quarter"},
+		{"stopped clock is not halftime", watch{Phase: 1, Period: 2}, games.Game{State: "in", Period: 2, Clock: 0}, ""},
+		{"skipped state reports current quarter", watch{Phase: 1, Period: 1}, games.Game{State: "in", Period: 3}, "Third quarter"},
+		{"final", watch{Phase: 3, Period: 4}, games.Game{State: "post", Period: 4, Completed: true}, "Final score"},
+		{"cancelled", watch{Phase: 1, Period: 1}, games.Game{State: "post", StatusCode: "STATUS_CANCELED"}, ""},
+		{"same snapshot", watch{Phase: 2, Period: 2}, games.Game{State: "in", StatusCode: "STATUS_HALFTIME", Period: 2}, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := event(c.before, c.game); got != c.want {
+			if got := event(c.watch, c.game); got != c.want {
 				t.Fatalf("got %q want %q", got, c.want)
 			}
 		})
@@ -57,7 +60,7 @@ func TestDeliveryRetryDedupAndCleanup(t *testing.T) {
 	f := &fakeFetcher{game: games.Game{ID: "1", State: "in", Period: 1}}
 	s := &Service{rdb: rdb, fetcher: f}
 	ctx := context.Background()
-	raw, _ := json.Marshal(watch{GameID: "1", Phase: 0})
+	raw, _ := json.Marshal(watch{GameID: "1", Version: watchVersion, Phase: 0})
 	key := "push:watch:1:device"
 	rdb.Set(ctx, key, raw, watchTTL)
 	attempts := 0
@@ -92,6 +95,81 @@ func TestDeliveryRetryDedupAndCleanup(t *testing.T) {
 		if k == key+":lease:lease" {
 			t.Fatal("recursive lease")
 		}
+	}
+}
+
+func TestQuarterLifecycle(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer rdb.Close()
+	ctx := context.Background()
+	key := "push:watch:1:device"
+	raw, _ := json.Marshal(watch{GameID: "1", Version: watchVersion})
+	rdb.Set(ctx, key, raw, watchTTL)
+	f := &fakeFetcher{}
+	s := &Service{rdb: rdb, fetcher: f}
+	var titles []string
+	s.send = func(_ context.Context, payload []byte, _ *webpush.Subscription) (int, error) {
+		var message map[string]string
+		if err := json.Unmarshal(payload, &message); err != nil {
+			t.Fatal(err)
+		}
+		titles = append(titles, message["title"])
+		return 201, nil
+	}
+	steps := []games.Game{
+		{ID: "1", ShortName: "AWY @ HOM", State: "in", Period: 1},
+		{ID: "1", ShortName: "AWY @ HOM", State: "in", Period: 2},
+		{ID: "1", ShortName: "AWY @ HOM", State: "in", Period: 2, StatusCode: "STATUS_HALFTIME"},
+		{ID: "1", ShortName: "AWY @ HOM", State: "in", Period: 3},
+		{ID: "1", ShortName: "AWY @ HOM", State: "in", Period: 4},
+		{ID: "1", ShortName: "AWY @ HOM", State: "post", Period: 4, Completed: true},
+	}
+	for _, game := range steps {
+		f.game = game
+		s.poll(ctx)
+		mr.FastForward(30 * time.Second)
+	}
+	want := []string{
+		"Tipoff · AWY @ HOM",
+		"Second quarter · AWY @ HOM",
+		"Halftime · AWY @ HOM",
+		"Third quarter · AWY @ HOM",
+		"Fourth quarter · AWY @ HOM",
+		"Final score · AWY @ HOM",
+	}
+	if fmt.Sprint(titles) != fmt.Sprint(want) {
+		t.Fatalf("got %v want %v", titles, want)
+	}
+	if rdb.Exists(ctx, key).Val() != 0 {
+		t.Fatal("completed watch not removed")
+	}
+}
+
+func TestLegacyWatchMigratesWithoutQuarterAlert(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer rdb.Close()
+	ctx := context.Background()
+	key := "push:watch:1:device"
+	raw, _ := json.Marshal(watch{GameID: "1", Phase: 1})
+	rdb.Set(ctx, key, raw, watchTTL)
+	s := &Service{rdb: rdb, fetcher: &fakeFetcher{game: games.Game{ID: "1", State: "in", Period: 2}}}
+	deliveries := 0
+	s.send = func(context.Context, []byte, *webpush.Subscription) (int, error) {
+		deliveries++
+		return 201, nil
+	}
+	s.poll(ctx)
+	if deliveries != 0 {
+		t.Fatal("legacy watch received a false quarter alert")
+	}
+	var migrated watch
+	if err := json.Unmarshal([]byte(rdb.Get(ctx, key).Val()), &migrated); err != nil {
+		t.Fatal(err)
+	}
+	if migrated.Version != watchVersion || migrated.Period != 2 {
+		t.Fatalf("watch not migrated: %+v", migrated)
 	}
 }
 func TestDisabledWatchCannotBeResurrected(t *testing.T) {
@@ -129,7 +207,7 @@ func TestInvalidSubscriptionsAreRemoved(t *testing.T) {
 			rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 			defer rdb.Close()
 			ctx := context.Background()
-			raw, _ := json.Marshal(watch{GameID: "1", Phase: 0})
+			raw, _ := json.Marshal(watch{GameID: "1", Version: watchVersion, Phase: 0})
 			rdb.Set(ctx, "push:watch:1:device", raw, watchTTL)
 			s := &Service{rdb: rdb, fetcher: &fakeFetcher{game: games.Game{ID: "1", State: "in", Period: 1}}}
 			s.send = func(context.Context, []byte, *webpush.Subscription) (int, error) { return status, nil }
