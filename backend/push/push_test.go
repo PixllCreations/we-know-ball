@@ -2,6 +2,9 @@ package push
 
 import (
 	"context"
+	"crypto/ecdh"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,10 +17,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type fakeFetcher struct{ game games.Game }
+type fakeFetcher struct {
+	game     games.Game
+	schedule []games.Game
+}
 
 func (f *fakeFetcher) FetchGame(context.Context, string) (games.Game, error)         { return f.game, nil }
 func (f *fakeFetcher) FetchScoreboard(context.Context, string) ([]games.Game, error) { return nil, nil }
+func (f *fakeFetcher) FetchSchedule(context.Context, string) ([]games.Game, error) {
+	return f.schedule, nil
+}
 func TestEvents(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -216,5 +225,47 @@ func TestInvalidSubscriptionsAreRemoved(t *testing.T) {
 				t.Fatal("invalid subscription not removed")
 			}
 		})
+	}
+}
+
+func TestTeamWatchSurvivesFinalAndAlertsOnNextGame(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer rdb.Close()
+	ctx := context.Background()
+	key := "push:team:7:device"
+	f := &fakeFetcher{schedule: []games.Game{{ID: "1", ShortName: "A @ B", State: "pre"}}}
+	privateKey, _ := ecdh.P256().GenerateKey(rand.Reader)
+	sub := webpush.Subscription{Endpoint: "https://fcm.googleapis.com/push/test", Keys: webpush.Keys{
+		Auth:   base64.RawURLEncoding.EncodeToString(make([]byte, 16)),
+		P256dh: base64.RawURLEncoding.EncodeToString(privateKey.PublicKey().Bytes()),
+	}}
+	raw, _ := json.Marshal(teamWatch{TeamID: "7", Subscription: sub, Games: map[string]deliveryState{"1": {Version: watchVersion, Phase: 0}}})
+	rdb.Set(ctx, key, raw, teamWatchTTL)
+	s := &Service{rdb: rdb, fetcher: f}
+	var titles []string
+	s.send = func(_ context.Context, payload []byte, _ *webpush.Subscription) (int, error) {
+		var message map[string]string
+		_ = json.Unmarshal(payload, &message)
+		titles = append(titles, message["title"])
+		return 201, nil
+	}
+	f.schedule[0].State, f.schedule[0].Period = "in", 1
+	s.poll(ctx)
+	mr.FastForward(30 * time.Second)
+	f.schedule[0].State, f.schedule[0].Completed, f.schedule[0].Period = "post", true, 4
+	s.poll(ctx)
+	mr.FastForward(30 * time.Second)
+	f.schedule = append(f.schedule, games.Game{ID: "2", ShortName: "B @ C", State: "pre"})
+	s.poll(ctx)
+	mr.FastForward(30 * time.Second)
+	f.schedule[1].State, f.schedule[1].Period = "in", 1
+	s.poll(ctx)
+	want := []string{"Tipoff · A @ B", "Final score · A @ B", "Tipoff · B @ C"}
+	if fmt.Sprint(titles) != fmt.Sprint(want) {
+		t.Fatalf("got %v want %v", titles, want)
+	}
+	if rdb.Exists(ctx, key).Val() != 1 {
+		t.Fatal("team watch was removed after a completed game")
 	}
 }

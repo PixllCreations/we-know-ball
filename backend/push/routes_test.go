@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -78,5 +79,39 @@ func TestRoutesSeedCurrentStateAndDisable(t *testing.T) {
 	f.game.Completed = true
 	if got := call("PUT", token, data).Code; got != 409 {
 		t.Fatalf("completed game accepted: %d", got)
+	}
+}
+
+func TestTeamRoutesAreIndependentFromGameRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer rdb.Close()
+	f := &fakeFetcher{schedule: []games.Game{{ID: "123", State: "pre"}}}
+	s := &Service{rdb: rdb, fetcher: f}
+	router := gin.New()
+	s.Routes(router.Group("/api/nba"))
+	key, _ := ecdh.P256().GenerateKey(rand.Reader)
+	sub := webpush.Subscription{Endpoint: "https://fcm.googleapis.com/push/test", Keys: webpush.Keys{
+		Auth: base64.RawURLEncoding.EncodeToString(make([]byte, 16)), P256dh: base64.RawURLEncoding.EncodeToString(key.PublicKey().Bytes()),
+	}}
+	body, _ := json.Marshal(sub)
+	token := strings.Repeat("a", 64)
+	req := httptest.NewRequest(http.MethodPut, "/api/nba/push/teams/7", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("PUT team status %d: %s", res.Code, res.Body.String())
+	}
+	for path, enabled := range map[string]bool{"/api/nba/push/teams/7": true, "/api/nba/push/games/123": false} {
+		req = httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		res = httptest.NewRecorder()
+		router.ServeHTTP(res, req)
+		if res.Code != http.StatusOK || strings.Contains(res.Body.String(), `"enabled":true`) != enabled {
+			t.Fatalf("GET %s status=%d body=%s", path, res.Code, res.Body.String())
+		}
 	}
 }

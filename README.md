@@ -200,7 +200,7 @@ Independent project. Not affiliated with, endorsed by, or associated with the NB
 
 MIT
 
-## Game push notifications
+## Game and team push notifications
 
 The deployed React client offers **Game alerts** on each unfinished game's detail
 page. Opt in on each device for tipoff, every quarter start, halftime, and the
@@ -208,6 +208,11 @@ final score; disable alerts
 from the same page. After enabling alerts, use **Send test alert** to verify the
 browser subscription and provider delivery immediately. No account is required.
 Angular does not yet expose these controls.
+
+Team pages also offer a persistent team subscription. It sends the same game
+events for every game on that team's schedule and remains active after an
+individual game finishes. Team selections last up to 400 days; one-off game
+selections continue to expire after seven days. Users can keep either or both.
 
 Enable the server after generating a stable VAPID key pair:
 
@@ -239,7 +244,7 @@ the previous public key and replaces them the next time that device enables a
 game alert. Existing per-game selections cannot migrate automatically and must
 be enabled again.
 
-The Go worker fetches watched game summaries directly from ESPN every 30 seconds,
+The Go worker fetches watched game summaries and subscribed-team schedules directly from ESPN every 30 seconds,
 independent of page traffic. It seeds each subscription from the current game
 state, avoiding old alerts when opting in. Halftime uses ESPN's explicit halftime
 status, not just a zero clock. Tipoff serves as the first-quarter alert; the

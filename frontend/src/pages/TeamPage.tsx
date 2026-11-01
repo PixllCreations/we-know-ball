@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Skeleton from "@/components/Skeleton";
+import TeamAlerts from "@/components/TeamAlerts";
 import { getTeam, getTeamRoster, getTeamSchedule, formatGameDate } from "@/lib/nba-api";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +73,8 @@ const TeamPage = () => {
           </div>
         </div>
       </section>
+
+      <TeamAlerts teamId={team.id} teamName={team.name || team.displayName} />
 
       {/* Quick stats */}
       {stats.length > 0 && (
