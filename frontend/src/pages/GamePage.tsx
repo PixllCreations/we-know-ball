@@ -8,34 +8,50 @@ import { cn } from "@/lib/utils";
 
 const participantLogo = (p: GameParticipant) => p.logo ?? p.logos?.[0]?.href;
 
+const normalizedText = (value?: string) => value?.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+
 const TeamSide = ({ team, reverse }: { team: GameParticipant; reverse?: boolean }) => {
   const logo = participantLogo(team);
   const record = team.records?.find((r) => r.type === "total")?.displayValue ?? team.records?.[0]?.displayValue;
 
   return (
-    <div className={cn("flex flex-1 items-center gap-6", reverse && "flex-row-reverse text-right")}>
+    <div
+      className={cn(
+        "flex min-w-0 flex-col items-center gap-2 text-center sm:gap-3 md:flex-1 md:flex-row md:gap-6 md:text-left",
+        reverse && "md:flex-row-reverse md:text-right",
+      )}
+    >
       {logo ? (
         <img
           src={logo}
           alt=""
-          className="h-28 w-28 shrink-0 object-contain md:h-32 md:w-32"
+          className="h-16 w-16 shrink-0 object-contain min-[400px]:h-20 min-[400px]:w-20 sm:h-24 sm:w-24 md:h-32 md:w-32"
         />
       ) : (
-        <div className="h-28 w-28 shrink-0 rounded-full bg-muted md:h-32 md:w-32" />
+        <div className="h-16 w-16 shrink-0 rounded-full bg-muted min-[400px]:h-20 min-[400px]:w-20 sm:h-24 sm:w-24 md:h-32 md:w-32" />
       )}
       <div className="min-w-0 text-center">
         <div
           className={cn(
-            "tabular font-display text-7xl font-bold leading-none md:text-8xl",
+            "tabular font-display text-4xl font-bold leading-none min-[400px]:text-5xl sm:text-6xl md:text-8xl",
             team.winner ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {team.score || "—"}
         </div>
-        <div className="mt-3 font-display text-2xl font-bold leading-tight md:text-3xl">{team.displayName}</div>
-        <div className="mt-1 font-mono text-xs uppercase tracking-wider text-muted-foreground md:text-sm">
-          {record ?? team.abbreviation}
+        <div className="mt-2 break-words font-display text-sm font-bold leading-tight min-[400px]:text-base sm:text-xl md:mt-3 md:text-3xl">
+          <span className="sm:hidden">{team.abbreviation}</span>
+          <span className="hidden sm:inline">{team.displayName}</span>
         </div>
+        {record ? (
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs md:text-sm">
+            {record}
+          </div>
+        ) : (
+          <div className="mt-1 hidden font-mono text-xs uppercase tracking-wider text-muted-foreground sm:block md:text-sm">
+            {team.abbreviation}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -86,6 +102,19 @@ const GameDetail = ({ game }: { game: Game }) => {
   const { home, away } = game;
   const isLive = game.state === "in";
   const isFinal = game.state === "post";
+  const statusText = game.detail || game.shortDetail || game.status;
+  const headline = [statusText, game.name, game.shortName].some(
+    (value) => normalizedText(value) === normalizedText(game.headline),
+  )
+    ? undefined
+    : game.headline;
+  const notes = (game.notes ?? []).filter(
+    (note, index, allNotes) =>
+      ![headline, statusText, game.name, game.shortName].some(
+        (value) => normalizedText(value) === normalizedText(note.headline),
+      ) &&
+      allNotes.findIndex((candidate) => normalizedText(candidate.headline) === normalizedText(note.headline)) === index,
+  );
   const boxscoreTeams = game.boxscore?.teams ?? [];
   const boxscorePlayers = game.boxscore?.players ?? [];
   const [viewMode, setViewMode] = useState<"team" | "player">("team");
@@ -119,25 +148,25 @@ const GameDetail = ({ game }: { game: Game }) => {
         ← Scoreboard
       </Link>
 
-      <section className="rounded-2xl border border-border bg-gradient-court p-6 shadow-card md:p-8">
+      <section className="rounded-2xl border border-border bg-gradient-court px-3 py-5 shadow-card min-[400px]:px-4 sm:p-6 md:p-8">
         <div className="mb-2 text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
           {formatGameDate(game.date)}
         </div>
 
-        {game.headline && (
-          <p className="mb-4 text-center font-display text-lg font-semibold text-foreground/90">{game.headline}</p>
+        {headline && (
+          <p className="mb-4 text-center font-display text-base font-semibold text-foreground/90 sm:text-lg">{headline}</p>
         )}
 
-        <div className="mb-8 flex items-center justify-center gap-2 font-mono text-base uppercase tracking-widest md:text-lg">
+        <div className="mb-6 flex items-center justify-center gap-2 text-center font-mono text-xs uppercase tracking-widest sm:text-base md:mb-8 md:text-lg">
           {isLive && <span className="live-dot" />}
           <span className={cn("text-muted-foreground", isLive && "text-live font-semibold")}>
-            {game.detail || game.shortDetail || game.status}
+            {statusText}
           </span>
         </div>
 
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-6">
+        <div className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 min-[400px]:gap-3 sm:gap-5 md:flex md:justify-between md:gap-6">
           <TeamSide team={away} />
-          <div className="font-display text-2xl font-bold uppercase tracking-widest text-muted-foreground md:text-3xl">
+          <div className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground min-[400px]:text-sm sm:text-xl sm:tracking-widest md:text-3xl">
             {isFinal ? "final" : "vs"}
           </div>
           <TeamSide
@@ -147,7 +176,7 @@ const GameDetail = ({ game }: { game: Game }) => {
         </div>
 
         {(game.venue || game.attendance) && (
-          <div className="mt-8 text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          <div className="mt-6 text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs md:mt-8">
             {game.venue?.fullName}
             {game.venue?.city && game.venue?.state && ` · ${game.venue.city}, ${game.venue.state}`}
             {game.attendance ? ` · ${game.attendance.toLocaleString()} attendance` : ""}
@@ -355,9 +384,9 @@ const GameDetail = ({ game }: { game: Game }) => {
         </section>
       )}
 
-      {game.notes && game.notes.length > 0 && (
+      {notes.length > 0 && (
         <section className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-          {game.notes.map((note) => (
+          {notes.map((note) => (
             <p key={`${note.type}-${note.headline}`}>{note.headline}</p>
           ))}
         </section>
